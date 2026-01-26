@@ -1572,8 +1572,12 @@ class BestdoriPlugin(Star):
                     "💡 提示：使用 /id [卡面ID] 可获取该卡面的高清插画大图"
                 )
             else:
-                yield event.plain_result("❌ 图片生成失败")
+                yield event.plain_result("❌ 图片生成失败，渲染未产生输出文件")
 
+        except RuntimeError as e:
+            # 渲染相关的运行时错误（如 Chrome 不可用）
+            logger.error(f"渲染最新卡面失败: {e}")
+            yield event.plain_result(f"❌ 渲染失败: {e}")
         except Exception as e:
             logger.error(f"获取最新卡面失败: {e}")
             import traceback
@@ -2636,8 +2640,12 @@ class BestdoriPlugin(Star):
                 )
                 yield event.image_result(output_path)
             else:
-                yield event.plain_result("❌ 图片生成失败。")
+                yield event.plain_result("❌ 图片生成失败，渲染未产生输出文件。")
 
+        except RuntimeError as e:
+            # 渲染相关的运行时错误（如 Chrome 不可用）
+            logger.error(f"渲染失败: {e}")
+            yield event.plain_result(f"❌ 渲染失败: {e}")
         except Exception as e:
             logger.error(f"渲染失败: {e}")
             import traceback

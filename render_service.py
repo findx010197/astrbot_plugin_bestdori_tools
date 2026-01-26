@@ -356,6 +356,14 @@ class RenderService:
         :param data: 模板数据
         :param output_path: 输出图片的绝对路径
         """
+        # 检查渲染功能是否可用
+        if not self.is_render_available():
+            logger.error("渲染活动卡片失败：Chrome/Chromium 不可用")
+            raise RuntimeError(
+                "图片渲染功能不可用：未找到 Chrome/Chromium 浏览器。\n"
+                "Docker 用户请执行: apt-get update && apt-get install -y chromium"
+            )
+
         template = self.env.get_template("event_card.html")
         html_content = template.render(**data)
 
@@ -372,12 +380,17 @@ class RenderService:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        self.hti.output_path = output_dir
-        # 设置更大的初始高度以容纳长图内容（从3000增加到6000）
-        # 需要配合 HTML 的 body { height: fit-content } 实现自适应
-        self.hti.screenshot(
-            html_str=html_content, save_as=output_file, size=(900, 6000)
-        )
+        try:
+            self.hti.output_path = output_dir
+            # 设置更大的初始高度以容纳长图内容（从3000增加到6000）
+            # 需要配合 HTML 的 body { height: fit-content } 实现自适应
+            self.hti.screenshot(
+                html_str=html_content, save_as=output_file, size=(900, 6000)
+            )
+            logger.info(f"活动卡片渲染成功: {output_path}")
+        except Exception as e:
+            logger.error(f"活动卡片渲染失败: {e}")
+            raise RuntimeError(f"渲染活动卡片失败: {e}") from e
 
         # 自动裁剪底部空白
         try:
@@ -422,6 +435,14 @@ class RenderService:
         :param data: 模板数据，包含新成员、活动详情、招募信息等
         :param output_path: 输出图片的绝对路径
         """
+        # 检查渲染功能是否可用
+        if not self.is_render_available():
+            logger.error("渲染活动一览卡片失败：Chrome/Chromium 不可用")
+            raise RuntimeError(
+                "图片渲染功能不可用：未找到 Chrome/Chromium 浏览器。\n"
+                "Docker 用户请执行: apt-get update && apt-get install -y chromium"
+            )
+
         template = self.env.get_template("event_overview_card.html")
         html_content = template.render(**data)
 
@@ -437,11 +458,16 @@ class RenderService:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        self.hti.output_path = output_dir
-        # 活动一览卡片通常更长，设置更大的初始高度
-        self.hti.screenshot(
-            html_str=html_content, save_as=output_file, size=(900, 8000)
-        )
+        try:
+            self.hti.output_path = output_dir
+            # 活动一览卡片通常更长，设置更大的初始高度
+            self.hti.screenshot(
+                html_str=html_content, save_as=output_file, size=(900, 8000)
+            )
+            logger.info(f"活动一览卡片渲染成功: {output_path}")
+        except Exception as e:
+            logger.error(f"活动一览卡片渲染失败: {e}")
+            raise RuntimeError(f"渲染活动一览卡片失败: {e}") from e
 
         # 自动裁剪：识别页脚并在页脚底部裁剪
         try:
@@ -534,6 +560,14 @@ class RenderService:
         :param data: 模板数据，包含 server_name, event_count, card_count, cards 等
         :param output_path: 输出图片的绝对路径
         """
+        # 检查渲染功能是否可用
+        if not self.is_render_available():
+            logger.error("渲染最新卡面卡片失败：Chrome/Chromium 不可用")
+            raise RuntimeError(
+                "图片渲染功能不可用：未找到 Chrome/Chromium 浏览器。\n"
+                "Docker 用户请执行: apt-get update && apt-get install -y chromium"
+            )
+
         template = self.env.get_template("latest_cards.html")
         html_content = template.render(**data)
 
@@ -549,11 +583,16 @@ class RenderService:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        self.hti.output_path = output_dir
-        # 最新卡面卡片可能很长，设置较大的初始高度
-        self.hti.screenshot(
-            html_str=html_content, save_as=output_file, size=(900, 8000)
-        )
+        try:
+            self.hti.output_path = output_dir
+            # 最新卡面卡片可能很长，设置较大的初始高度
+            self.hti.screenshot(
+                html_str=html_content, save_as=output_file, size=(900, 8000)
+            )
+            logger.info(f"最新卡面卡片渲染成功: {output_path}")
+        except Exception as e:
+            logger.error(f"最新卡面卡片渲染失败: {e}")
+            raise RuntimeError(f"渲染最新卡面卡片失败: {e}") from e
 
         # 自动裁剪：识别页脚并在页脚底部裁剪
         self._auto_crop_by_footer(output_path)
