@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活动一览</title>
+    <style>
+        html, body {
+            height: fit-content;
+            width: 880px;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+            /* 游戏经典粉色波点背景 */
+            background-color: #fff0f5;
+            background-image: 
+                radial-gradient(#ffdae8 2px, transparent 2px),
+                radial-gradient(#ffdae8 2px, transparent 2px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+        
+        .event-poster-container {
+            max-width: 840px;
+            margin: 20px auto;
+            /* 主体背景 */
+            background: linear-gradient(180deg, #fffcfd 0%, #fff0f3 100%);
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            /* 左右增加装饰性边框 */
+            border-left: 8px solid #ffb7ce;
+            border-right: 8px solid #ffb7ce;
+        }
+        
+        /* =================== HEADER 区域 - 活动封面 =================== */
+        .hero-banner {
+            position: relative;
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+        
+        /* 活动封面图（5星卡面特训前大图） */
+        .hero-cover-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+            /* 使用mask实现从80%位置开始的透明渐变 */
+            mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, black 75%, transparent 100%);
+        }
+        
+        /* 活动Logo - 左上角 */
+        .event-logo-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+        
+        .event-logo-overlay img {
+            height: 160px; /* 放大到原来的两倍 */
+            width: auto;
+            filter: drop-shadow(0 6px 20px rgba(0,0,0,0.5));
+        }
+        
+        /* 新成员表格容器 - 1x2表格结构 */
+        .new-member-table {
+            margin: 20px 30px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 
+                0 8px 20px rgba(212, 101, 138, 0.15),
+                0 2px 6px rgba(0, 0, 0, 0.05);
+            border: 4px solid rgba(255, 255, 255, 0.6); /* 半透明白边 */
+            background: white;
+        }
+        
+        /* 通用标题栏样式增强 */
+        .new-member-badge, .info-header-cell {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* 添加斜纹装饰遮罩 */
+        .new-member-badge::after, .info-header-cell::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.1),
+                rgba(255, 255, 255, 0.1) 10px,
+                transparent 10px,
+                transparent 20px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 新成员构件 - 表格第一行（图片+文字） */
+        .new-member-badge {
+            width: 100%;
+            text-align: center;
+            background: linear-gradient(135deg, #ff9ec4 0%, #ff6b9d 100%);
+            padding: 0;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+            z-index: 2;
+        }
+        
+        .new-member-badge img {
+            width: 100%;
+            height: 50px; /* 降低构件高度 */
+            object-fit: cover;
+            display: block;
+        }
+        
+        /* 新成员文字覆盖在图片上 */
+        .new-member-badge .badge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-shadow: 
+                0 2px 0px rgba(212, 101, 138, 1), /* 描边效果 */
+                0 4px 8px rgba(0,0,0,0.2);
+            white-space: nowrap;
+            z-index: 10;
+        }
+        
+        .new-member-badge-fallback {
+            padding: 12px 60px;
+            color: white;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-shadow: 0 2px 0px rgba(180, 80, 110, 0.8);
+            z-index: 10;
+        }
+        
+        /* 新卡面容器 - 表格第二行，淡白卡其色背景（紧贴第一行） */
+        .new-cards-container {
+            padding: 30px;
+            background: linear-gradient(180deg, #faf8f5 0%, #f5f0e8 100%);
+        }
+        
+        /* 卡面内层表格 - 圆角白色容器 */
+        .cards-inner-table {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 0 10px;
+            box-shadow: 0 4px 16px rgba(212, 101, 138, 0.15);
+        }
+        
+        /* 单张卡面记录 */
+        .card-record {
+            margin-bottom: 25px;
+        }
+        
+        .card-record:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* 卡面图片行 - 特训前/后并排 */
+        .card-images-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+        
+        /* 单个卡面容器 */
+        .card-box {
+            position: relative;
+            flex: 1;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* 卡面图片 */
+        .card-box .card-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* 外框装饰层 */
+        .card-box .card-frame {
+            position: absolute;
+            top: -2%;
+            left: -1.5%;
+            width: 103%;
+            height: 104%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* 乐队图标 - 左上角 */
+        .card-box .card-band-icon {
+            position: absolute;
+            top: 3%;
+            left: 2%;
+            width: 10%; /* 缩小到原来的三分之二 */
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        /* 属性图标 - 右上角（与外框圆圈对齐） */
+        .card-box .card-attr-icon {
+            position: absolute;
+            top: 0.5%;
+            right: 0.5%;
+            width: 11%;
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        /* 星级 - 左下角竖排 */
+        .card-box .card-stars {
+            position: absolute;
+            bottom: 4%;
+            left: 0.5%; /* 微调位置 */
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            z-index: 15;
+        }
+        
+        .card-box .card-star-icon {
+            width: 16px;
+            height: 16px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+        }
+        
+        /* 卡面名称行 */
+        .card-name-row {
+            text-align: center;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #fff5f7 0%, #ffecf0 100%);
+            border-radius: 8px;
+            color: #5a3050;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            margin-top: 10px;
+        }
+        
+        /* 活动一览表格容器 - 上移到封面区域 */
+        .event-info-table {
+            margin: -80px 30px 20px 30px; /* 负边距上移 */
+            position: relative;
+            z-index: 5;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(212, 180, 140, 0.2);
+        }
+        
+        /* 活动一览第一行 - 标题构件 */
+        .event-info-header {
+            background: linear-gradient(135deg, #fff0f3 0%, #ffe4ec 100%);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .event-info-header .band-icon {
+            width: 36px;
+            height: 36px;
+            margin-right: 12px;
+        }
+        
+        .event-info-header .info-text {
+            color: #4a2848;
+            font-weight: 700;
+        }
+        
+        .event-info-header .info-label {
+            font-size: 13px;
+            opacity: 0.85;
+            letter-spacing: 0.5px;
+        }
+        
+        .event-info-header .info-date {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            margin-top: 2px;
+        }
+        
+        /* 活动类型徽章 */
+        .event-type-badge {
+            display: flex;
+            align-items: center;
+            margin-left: auto;
+            padding: 6px 14px;
+            background: linear-gradient(135deg, #ff9ec4 0%, #ff6b9d 100%);
+            border-radius: 20px;
+            box-shadow: 0 3px 8px rgba(255, 107, 157, 0.35);
+        }
+        
+        .event-type-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 6px;
+            filter: brightness(0) invert(1);
+        }
+        
+        .event-type-text {
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        
+        /* 活动一览第二行 - 参会人员 */
+        .event-info-members {
+            background: white;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .event-info-members .member-label {
+            font-size: 13px;
+            color: #6b4a5b;
+            margin-right: 10px;
+            white-space: nowrap;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .event-info-members .member-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: 2px solid rgba(212, 101, 138, 0.25);
+            object-fit: cover;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        /* =================== NEW MEMBERS 区域 =================== */
+        .new-members {
+            padding: 0;
+            background: transparent;
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #d4658a;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+            display: none; /* 隐藏，由新成员构件替代 */
+        }
+        
+        .member-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 16px rgba(212, 101, 138, 0.15);
+            display: flex;
+            align-items: center;
+            border: 1px solid rgba(212, 101, 138, 0.1);
+        }
+        
+        .card-images {
+            position: relative;
+            display: flex;
+            gap: 15px;
+            margin-right: 20px;
+        }
+        
+        .card-images img {
+            width: 100px;
+            height: 100px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 3px solid #ffe4ec;
+        }
+        
+        .icon-attribute {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff6b9d, #d4658a);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .card-info {
+            flex: 1;
+        }
+        
+        .rarity {
+            background: linear-gradient(45deg, #ffd700, #ffb347);
+            color: #333;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-right: 15px;
+            display: inline-block;
+        }
+        
+        .card-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4a3347;
+            line-height: 1.4;
+        }
+        
+        /* =================== SPLIT COLUMNS 区域 =================== */
+        .info-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        
+        /* 2x2表格布局 */
+        .info-table {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            width: 100%;
+        }
+        
+        /* 第一行标题行容器 */
+        .info-header-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px 30px;
+            background: linear-gradient(180deg, #fff5f7 0%, #fff0f3 100%);
+            grid-column: 1 / -1;
+            border-bottom: 2px dashed rgba(212, 101, 138, 0.2); /* 虚线分割 */
+        }
+        
+        /* 表头构件 - 使用newmember構件样式 */
+        .info-header-cell {
+            flex: 1;
+            max-width: 400px;
+            text-align: center;
+            background: linear-gradient(135deg, #ff9ec4 0%, #ff6b9d 100%);
+            padding: 0;
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(255, 107, 157, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+        }
+        
+        .info-header-cell img {
+            width: 100%;
+            height: 50px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .info-header-cell .header-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-shadow: 
+                0 2px 0px rgba(212, 101, 138, 1),
+                0 4px 8px rgba(0,0,0,0.2);
+            white-space: nowrap;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+        }
+        
+        .info-header-fallback {
+            padding: 12px 20px;
+            color: white;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-shadow: 0 2px 0px rgba(180, 80, 110, 0.8);
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+        }
+        
+        /* 内容行（第二行）- 淡白卡其色背景 */
+        .info-content-cell {
+            background: linear-gradient(180deg, #f5efe8 0%, #f0e8dc 100%);
+            padding: 10px 40px 20px 40px; /* 上移：减少顶部padding */
+            min-height: 250px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .info-content-cell:first-of-type {
+            border-right: 1px solid rgba(212, 101, 138, 0.15);
+            justify-content: flex-end; /* 左侧区域内容靠右 */
+            padding-right: 15px; /* 间隔一半 */
+        }
+        
+        .info-content-cell:last-of-type {
+            justify-content: flex-start; /* 右侧区域内容靠左 */
+            padding-left: 15px; /* 间隔一半 */
+        }
+        
+        /* 内容包装器 - 控制宽度与构件对齐 */
+        .info-content-wrapper {
+            width: 100%;
+            max-width: 400px; /* 与构件max-width一致 */
+        }
+        
+        /* =================== FOOTER 区域 =================== */
+        .copyright {
+            background: #6b3a5b;
+            color: #e8c4d4;
+            text-align: center;
+            padding: 16px 20px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            border-top: 4px solid #8b5a6b;
+        }
+        
+        /* =================== 招募卡池卡片样式 =================== */
+        .gacha-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(212, 101, 138, 0.1);
+            width: 100%; /* 确保填满容器 */
+            position: relative;
+        }
+        
+        /* 顶部装饰条 */
+        .gacha-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ff9ec4, #ff6b9d);
+            z-index: 1;
+        }
+        
+        .gacha-card .gacha-banner {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .gacha-card .gacha-details {
+            padding: 10px 14px;
+        }
+        
+        .gacha-card .gacha-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #4a3347;
+            margin-bottom: 5px;
+            line-height: 1.35;
+            letter-spacing: 0.2px;
+        }
+        
+        .gacha-card .gacha-type {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff6b9d, #d4658a);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            letter-spacing: 0.3px;
+        }
+        
+        .gacha-card .gacha-time {
+            font-size: 11px;
+            color: #7a5060;
+            letter-spacing: 0.2px;
+        }
+        
+        /* =================== 活动报酬区域（表格布局） =================== */
+        .reward-section {
+            width: 100%;
+        }
+        
+        /* 报酬成员标题 */
+        .reward-title {
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #5a3050;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(212, 101, 138, 0.25);
+            letter-spacing: 1px;
+        }
+        
+        /* 报酬卡面容器 - 水平居中排列多张卡面 */
+        .reward-cards-wrapper {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        /* 单个报酬卡面容器 */
+        .reward-card-container {
+            position: relative;
+            display: block; /* 改为 block 以占满行宽 */
+            width: 100%;
+            margin: 0;      /* 移除边距，确保与上方构件对齐 */
+            margin-bottom: 20px;
+        }
+        
+        /* 报酬卡面Live2D小人 */
+        .reward-costume-img {
+            position: absolute;
+            bottom: -5px;   /* 微调底部对齐 */
+            right: -85px;   /* 人物中线在大致在右边缘 (假设图片宽约170px) */
+            height: 170px;
+            width: auto;
+            z-index: 20;
+            filter: drop-shadow(2px 2px 5px rgba(0,0,0,0.3));
+            pointer-events: none;
+        }
+        
+        /* 报酬卡面 - 放大尺寸 */
+        .reward-card-box {
+            position: relative;
+            width: 100%; /* 宽度填满容器，与上方构件对齐 */
+            aspect-ratio: 16 / 9;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12); /* 增加一点阴影让卡面更立体 */
+            border: 3px solid white; /* 白色边框增加照片感 */
+        }
+        
+        .reward-card-box .card-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .reward-card-box .card-frame {
+            position: absolute;
+            top: -2%;
+            left: -1.5%;
+            width: 103%;
+            height: 104%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* 报酬卡面乐队图标 - 左上角 */
+        .reward-card-box .card-band-icon {
+            position: absolute;
+            top: 3%;
+            left: 2%;
+            width: 10%;
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        /* 报酬卡面属性图标 - 右上角（与外框圆圈对齐） */
+        .reward-card-box .card-attr-icon {
+            position: absolute;
+            top: 0.5%;
+            right: 0.5%;
+            width: 11%;
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        .reward-card-box .card-stars {
+            position: absolute;
+            bottom: 4%;
+            left: 1%;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            z-index: 15;
+        }
+        
+        .reward-card-box .card-star-icon {
+            width: 22px; /* 放大星星图标 */
+            height: 22px;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+        }
+        
+        /* 报酬卡面信息 */
+        .reward-card-info {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #5a3a50;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        /* 第三行：追加歌曲 + 表情包 */
+        .extras-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 100%; /* 确保不超出父容器 */
+            box-sizing: border-box;
+        }
+        
+        .extra-item {
+            background: white;
+            border-radius: 12px;
+            padding: 14px 12px;
+            text-align: center;
+            box-shadow: 
+                0 4px 12px rgba(212, 101, 138, 0.1),
+                0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid rgba(212, 101, 138, 0.15);
+            min-width: 0; /* 允许收缩 */
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+        
+        .extra-item .extra-label {
+            display: block;
+            font-size: 12px;
+            color: #6b4a5b;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+        
+        .extra-item .extra-icon {
+            width: 100px; /* 调整图标大小以适应容器 */
+            height: 100px;
+            border-radius: 10px;
+            object-fit: cover;
+            max-width: 100%;
+        }
+        
+        .extra-item .extra-name {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #4a3347;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+        
+        /* 多首歌曲网格布局 */
+        .songs-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            justify-items: center;
+            width: 100%;
+        }
+        
+        .songs-grid.songs-count-1 {
+            grid-template-columns: 1fr;
+        }
+        
+        .songs-grid.songs-count-2,
+        .songs-grid.songs-count-3,
+        .songs-grid.songs-count-4 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .songs-grid.songs-count-5,
+        .songs-grid.songs-count-6 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
+        .songs-grid.songs-count-7,
+        .songs-grid.songs-count-8 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        .song-item {
+            text-align: center;
+            min-width: 0;
+        }
+        
+        .song-item .song-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 5px;
+            object-fit: cover;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .song-item .song-title {
+            margin-top: 3px;
+            font-size: 8px;
+            color: #4a3347;
+            font-weight: 500;
+            line-height: 1.2;
+            max-width: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* 单首歌曲时的大图标 */
+        .songs-grid.songs-count-1 .song-item .song-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+        }
+        
+        .songs-grid.songs-count-1 .song-item .song-title {
+            font-size: 12px;
+            max-width: 120px;
+            white-space: normal;
+            color: #5a3a50;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+        
+        /* 2-4首歌曲时的中等图标 */
+        .songs-grid.songs-count-2 .song-item .song-icon,
+        .songs-grid.songs-count-3 .song-item .song-icon,
+        .songs-grid.songs-count-4 .song-item .song-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+        }
+        
+        /* =================== 占位符样式 =================== */
+        .placeholder {
+            background: rgba(212, 101, 138, 0.1);
+            border: 2px dashed #d4658a;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #8b5a6b;
+            font-style: italic;
+            margin: 10px 0;
+        }
+        
+        .placeholder.image {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="event-poster-container">
+        <!-- =================== HEADER: 活动封面区域 =================== -->
+        <header class="hero-banner">
+            <!-- 活动封面图（5星卡面特训前大图） -->
+            {% if cover_image %}
+            <img src="{{ cover_image }}" alt="活动封面" class="hero-cover-image">
+            {% else %}
+            <div style="height: 400px; background: linear-gradient(45deg, #ff6b9d, #d4658a);"></div>
+            {% endif %}
+            
+            <!-- 活动Logo - 左上角 -->
+            {% if event_logo %}
+            <div class="event-logo-overlay">
+                <img src="{{ event_logo }}" alt="{{ event_name }}">
+            </div>
+            {% endif %}
+        </header>
+        
+        <!-- 活动一览表格：标题构件 + 参会人员 -->
+        <div class="event-info-table">
+            <!-- 第一行：活动一览 -->
+            <div class="event-info-header">
+                {% if band_icon %}
+                <img src="{{ band_icon }}" alt="" class="band-icon">
+                {% endif %}
+                <div class="info-text">
+                    <div class="info-label">活动时间</div>
+                    <div class="info-date">{{ start_time }} ~ {{ end_time }}</div>
+                </div>
+                <div class="event-type-badge">
+                    {% if event_type_icon %}
+                    <img src="{{ event_type_icon }}" alt="" class="event-type-icon" onerror="this.style.display='none'">
+                    {% endif %}
+                    <span class="event-type-text">{{ event_type }}活动</span>
+                </div>
+            </div>
+            <!-- 第二行：参会人员图标 -->
+            <div class="event-info-members">
+                <span class="member-label">参会成员</span>
+                {% if attr_icon %}
+                <img src="{{ attr_icon }}" alt="属性" class="member-icon">
+                {% endif %}
+                {% for char_icon in char_icons %}
+                <img src="{{ char_icon }}" alt="角色" class="member-icon">
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- 新成员表格：标题 + 卡面区域，整体发光 -->
+        <div class="new-member-table">
+            <!-- 第一行：新成员登场构件（图片+文字叠加） -->
+            <div class="new-member-badge">
+                {% if newmember_image %}
+                <img src="{{ newmember_image }}" alt="新成员登场">
+                {% endif %}
+                <div class="{% if newmember_image %}badge-text{% else %}new-member-badge-fallback{% endif %}">新成员登场</div>
+            </div>
+            
+            <!-- 第二行：淡白卡其色背景卡面容器（紧贴第一行） -->
+            <div class="new-cards-container">
+                <!-- 内层圆角白色卡面表格 -->
+                <div class="cards-inner-table">
+                {% for card in new_cards %}
+                    <div class="card-record">
+                        <!-- 卡面图片行：特训前/特训后并排 -->
+                        <div class="card-images-row">
+                            <!-- 特训前卡面 -->
+                            <div class="card-box">
+                                {% if card.unidolized_image %}
+                                <img src="{{ card.unidolized_image }}" class="card-img" alt="特训前">
+                                {% endif %}
+                                <img src="{{ card.frame_url }}" class="card-frame">
+                                {% if card.band_icon %}
+                                <img src="{{ card.band_icon }}" class="card-band-icon">
+                                {% endif %}
+                                {% if card.attr_icon %}
+                                <img src="{{ card.attr_icon }}" class="card-attr-icon">
+                                {% endif %}
+                                <div class="card-stars">
+                                    {% for i in range(card.rarity) %}
+                                    <img src="https://bestdori.com/res/icon/star.png" class="card-star-icon">
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <!-- 特训后卡面（仅3星及以上）/ 二星及以下留空占位 -->
+                            {% if card.rarity >= 3 %}
+                            <div class="card-box">
+                                {% if card.idolized_image %}
+                                <img src="{{ card.idolized_image }}" class="card-img" alt="特训后">
+                                {% endif %}
+                                <img src="{{ card.frame_url }}" class="card-frame">
+                                {% if card.band_icon %}
+                                <img src="{{ card.band_icon }}" class="card-band-icon">
+                                {% endif %}
+                                {% if card.attr_icon %}
+                                <img src="{{ card.attr_icon }}" class="card-attr-icon">
+                                {% endif %}
+                                <div class="card-stars">
+                                    {% for i in range(card.rarity) %}
+                                    <img src="https://bestdori.com/res/icon/star_trained.png" class="card-star-icon">
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- 二星及以下：右侧留空占位 -->
+                            <div class="card-box" style="visibility: hidden;"></div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 卡面名称行 -->
+                        <div class="card-name-row">
+                            {{ card.character_name }} - {{ card.title }}
+                        </div>
+                    </div>
+                {% endfor %}
+                
+                {% if not new_cards %}
+                <div class="placeholder">
+                    暂无新成员信息
+                </div>
+                {% endif %}
+                </div><!-- 关闭 cards-inner-table -->
+            </div><!-- 关闭 new-cards-container -->
+        </div><!-- 关闭 new-member-table -->
+        
+        <main>
+            
+            <!-- =================== INFO COLUMNS: 2x2表格布局 =================== -->
+            <div class="info-table">
+                <!-- 第一行：标题行容器 -->
+                <div class="info-header-row">
+                    <!-- 活动类型 & 活动报酬标题 -->
+                    <div class="info-header-cell">
+                        {% if newmember_image %}
+                        <img src="{{ newmember_image }}" alt="活动报酬">
+                        {% endif %}
+                        <div class="{% if newmember_image %}header-text{% else %}info-header-fallback{% endif %}">{{ event_type }}活动</div>
+                    </div>
+                    
+                    <!-- 招募登场标题 -->
+                    <div class="info-header-cell">
+                        {% if newmember_image %}
+                        <img src="{{ newmember_image }}" alt="招募登场">
+                        {% endif %}
+                        <div class="{% if newmember_image %}header-text{% else %}info-header-fallback{% endif %}">招募登场</div>
+                    </div>
+                </div>
+                
+                <!-- 第二行第一列：活动报酬内容 -->
+                <div class="info-content-cell">
+                    <div class="info-content-wrapper">
+                        <div class="reward-section">
+                            <!-- 第一行：报酬成员标题 -->
+                            <div class="reward-title">报酬成员</div>
+                            
+                            <!-- 第二行：报酬卡面（支持多张★3） -->
+                            {% if reward_cards %}
+                            <div class="reward-cards-wrapper">
+                                {% for reward_card in reward_cards %}
+                                <div class="reward-card-container">
+                                    <div class="reward-card-box">
+                                        {% if reward_card.image %}
+                                        <img src="{{ reward_card.image }}" class="card-img" alt="★{{ reward_card.rarity }} {{ reward_card.character_name }}">
+                                        {% endif %}
+                                        <img src="{{ reward_card.frame_url }}" class="card-frame">
+                                        {% if reward_card.band_icon %}
+                                        <img src="{{ reward_card.band_icon }}" class="card-band-icon">
+                                        {% endif %}
+                                        {% if reward_card.attr_icon %}
+                                        <img src="{{ reward_card.attr_icon }}" class="card-attr-icon">
+                                        {% endif %}
+                                        <div class="card-stars">
+                                            {% for i in range(reward_card.rarity) %}
+                                            <img src="https://bestdori.com/res/icon/star.png" class="card-star-icon">
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% if reward_card.costume_image %}
+                                    <img src="{{ reward_card.costume_image }}" class="reward-costume-img" onerror="this.style.display='none'" alt="Live2D">
+                                    {% endif %}
+                                    <div class="reward-card-info">
+                                        ★{{ reward_card.rarity }} {{ reward_card.character_name }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="placeholder">
+                                报酬成员信息待填充
+                            </div>
+                            {% endif %}
+                            
+                            <!-- 第三行：追加歌曲 + 表情包奖励 -->
+                            <div class="extras-row">
+                                <!-- 追加歌曲 -->
+                                <div class="extra-item">
+                                    <span class="extra-label">追加歌曲{% if bonus_songs and bonus_songs|length > 1 %} ({{ bonus_songs|length }}首){% endif %}</span>
+                                    {% if bonus_songs and bonus_songs|length > 0 %}
+                                    <div class="songs-grid songs-count-{{ [bonus_songs|length, 8]|min }}">
+                                        {% for song in bonus_songs[:8] %}
+                                        <div class="song-item">
+                                            <img src="{{ song.jacket }}" class="song-icon" alt="{{ song.title }}" onerror="this.onerror=null; this.src='https://bestdori.com/res/icon/band_{{ song.band_id or 0 }}.svg';">
+                                            {% if bonus_songs|length == 1 %}
+                                            <div class="song-title">{{ song.title }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% elif bonus_song and bonus_song.jacket %}
+                                    <img src="{{ bonus_song.jacket }}" class="extra-icon" alt="{{ bonus_song.title }}" onerror="this.onerror=null; this.src='https://bestdori.com/res/icon/song_jacket.png';">
+                                    <div class="extra-name">{{ bonus_song.title }}</div>
+                                    {% else %}
+                                    <div class="placeholder" style="width: 120px; height: 120px; margin: 0 auto; padding: 10px;">
+                                        歌曲
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- 表情包奖励 -->
+                                <div class="extra-item">
+                                    <span class="extra-label">表情包奖励</span>
+                                    {% if stamp_reward and stamp_reward.image %}
+                                    <img src="{{ stamp_reward.image }}" class="extra-icon" alt="表情包">
+                                    {% else %}
+                                    <div class="placeholder" style="width: 120px; height: 120px; margin: 0 auto; padding: 10px;">
+                                        表情
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 第二行第二列：招募卡池内容 -->
+                <div class="info-content-cell">
+                    <div class="info-content-wrapper">
+                        {% for gacha in gacha_list %}
+                        <div class="gacha-card">
+                            <img src="{{ gacha.banner_image or cover_image or '' }}" class="gacha-banner" alt="{{ gacha.name }}" style="{% if not gacha.banner_image and not cover_image %}display:none;{% endif %}">
+                            <div class="gacha-details">
+                                <div class="gacha-name">{{ gacha.name }}</div>
+                                {% if gacha.gacha_type %}
+                                <div class="gacha-type">{{ gacha.gacha_type }}</div>
+                                {% endif %}
+                                <div class="gacha-time">招募时间: {{ gacha.start_date }} ~ {{ gacha.end_date }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not gacha_list %}
+                        <div class="placeholder">
+                            招募信息待填充
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- =================== FOOTER: 版权信息 =================== -->
+        <footer class="copyright">
+            ©BanG Dream! Project ©bilibili 2017.
+        </footer>
+    </div>
+</body>
+</html>

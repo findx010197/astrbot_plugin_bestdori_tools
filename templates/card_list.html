@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        html, body {
+            width: {{ container_width }}px;
+            height: fit-content;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #fff5f7 0%, #ffeef2 50%, #fff8fa 100%);
+            padding: 25px;
+            box-sizing: border-box;
+        }
+        
+        /* 左上角标题表格 - 加强圆角和长度 */
+        .title-box {
+            display: inline-block;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        .title-row-1 {
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff4e88 100%);
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 10px 40px;
+            text-align: center;
+        }
+        .title-row-2 {
+            background: white;
+            color: #333;
+            font-size: 26px;
+            font-weight: 700;
+            padding: 14px 40px;
+        }
+        
+        /* 主内容区域 - 横向布局 */
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            padding: 30px;
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        
+        /* 左侧角色图标 */
+        .char-icon-container {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding-top: 10px;
+        }
+        .char-icon {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 4px solid #ff4e88;
+            box-shadow: 0 4px 15px rgba(255, 78, 136, 0.35);
+        }
+        .char-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #555;
+            text-align: center;
+        }
+        .card-count {
+            font-size: 13px;
+            color: #999;
+        }
+        
+        /* 右侧卡面网格 - 四行横向排列 */
+        .cards-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        /* 属性行 - 横向排列 */
+        .attr-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            background: #fafafa;
+        }
+        .attr-icon {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+        .attr-cards {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 10px;
+            flex: 1;
+        }
+        
+        /* 单个卡面缩略图 */
+        .card-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card-thumb {
+            position: relative;
+            width: 85px;
+            height: 85px;
+        }
+        .card-thumb-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .card-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        /* 右上角属性图标 - 更靠右上角 */
+        .card-attr {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            width: 22px;
+            height: 22px;
+            z-index: 3;
+        }
+        
+        /* 左上角乐队图标 - 缩小到80%并靠左上角，无背景 */
+        .card-band {
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 18px;
+            height: 18px;
+            z-index: 3;
+        }
+        
+        /* 左下角星级图标 - 缩小到80%，紧密竖向排列，与左下角对齐 */
+        .card-stars {
+            position: absolute;
+            bottom: 0px;
+            left: 0px;
+            display: flex;
+            flex-direction: column;
+            gap: -2px;
+            z-index: 3;
+        }
+        .star-icon {
+            width: 11px;
+            height: 11px;
+        }
+        
+        /* 卡面ID */
+        .card-id {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        /* 底部提示 */
+        .footer-tip {
+            margin-top: 25px;
+            padding: 18px 25px;
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff4e88 100%);
+            border-radius: 12px;
+            font-size: 14px;
+            color: white;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(255, 78, 136, 0.3);
+        }
+        .footer-tip code {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-family: monospace;
+            color: white;
+            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        
+        /* 属性行背景色 */
+        .attr-row.happy { 
+            border-left: 5px solid #ff8800; 
+            background: linear-gradient(90deg, #fff8f0 0%, #fafafa 100%);
+        }
+        .attr-row.cool { 
+            border-left: 5px solid #4455ff; 
+            background: linear-gradient(90deg, #f0f4ff 0%, #fafafa 100%);
+        }
+        .attr-row.pure { 
+            border-left: 5px solid #44bb44; 
+            background: linear-gradient(90deg, #f0fff0 0%, #fafafa 100%);
+        }
+        .attr-row.powerful { 
+            border-left: 5px solid #ff4455; 
+            background: linear-gradient(90deg, #fff0f2 0%, #fafafa 100%);
+        }
+        
+        /* 无卡面提示 */
+        .no-cards {
+            color: #ccc;
+            font-size: 14px;
+            padding: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- 左上角标题 -->
+    <div class="title-box">
+        <div class="title-row-1">查询</div>
+        <div class="title-row-2">卡牌列表</div>
+    </div>
+    
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <!-- 左侧角色图标 -->
+        <div class="char-icon-container">
+            <img class="char-icon" src="{{ char_icon_url }}" alt="{{ char_name }}">
+            <div class="char-name">{{ char_name }}</div>
+            <div class="card-count">共 {{ total_count }} 张</div>
+        </div>
+        
+        <!-- 右侧卡面区 - 四行属性 -->
+        <div class="cards-container">
+            <!-- Happy 属性行 -->
+            <div class="attr-row happy">
+                <img class="attr-icon" src="{{ happy_icon_url }}" alt="happy">
+                <div class="attr-cards">
+                    {% if happy_cards %}
+                    {% for card in happy_cards %}
+                    <div class="card-item">
+                        <div class="card-thumb">
+                            <img class="card-thumb-img" src="{{ card.thumb_url }}" alt="Card {{ card.card_id }}">
+                            <img class="card-frame" src="{{ card.frame_url }}" alt="">
+                            <img class="card-attr" src="{{ happy_icon_url }}" alt="">
+                            <img class="card-band" src="{{ card.band_icon_url }}" alt="">
+                            <div class="card-stars">
+                                {% for star in card.stars %}
+                                <img class="star-icon" src="{{ star.star_icon_url }}" alt="">
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="card-id">ID:{{ card.card_id }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-cards">暂无</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Cool 属性行 -->
+            <div class="attr-row cool">
+                <img class="attr-icon" src="{{ cool_icon_url }}" alt="cool">
+                <div class="attr-cards">
+                    {% if cool_cards %}
+                    {% for card in cool_cards %}
+                    <div class="card-item">
+                        <div class="card-thumb">
+                            <img class="card-thumb-img" src="{{ card.thumb_url }}" alt="Card {{ card.card_id }}">
+                            <img class="card-frame" src="{{ card.frame_url }}" alt="">
+                            <img class="card-attr" src="{{ cool_icon_url }}" alt="">
+                            <img class="card-band" src="{{ card.band_icon_url }}" alt="">
+                            <div class="card-stars">
+                                {% for star in card.stars %}
+                                <img class="star-icon" src="{{ star.star_icon_url }}" alt="">
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="card-id">ID:{{ card.card_id }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-cards">暂无</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Pure 属性行 -->
+            <div class="attr-row pure">
+                <img class="attr-icon" src="{{ pure_icon_url }}" alt="pure">
+                <div class="attr-cards">
+                    {% if pure_cards %}
+                    {% for card in pure_cards %}
+                    <div class="card-item">
+                        <div class="card-thumb">
+                            <img class="card-thumb-img" src="{{ card.thumb_url }}" alt="Card {{ card.card_id }}">
+                            <img class="card-frame" src="{{ card.frame_url }}" alt="">
+                            <img class="card-attr" src="{{ pure_icon_url }}" alt="">
+                            <img class="card-band" src="{{ card.band_icon_url }}" alt="">
+                            <div class="card-stars">
+                                {% for star in card.stars %}
+                                <img class="star-icon" src="{{ star.star_icon_url }}" alt="">
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="card-id">ID:{{ card.card_id }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-cards">暂无</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Powerful 属性行 -->
+            <div class="attr-row powerful">
+                <img class="attr-icon" src="{{ powerful_icon_url }}" alt="powerful">
+                <div class="attr-cards">
+                    {% if powerful_cards %}
+                    {% for card in powerful_cards %}
+                    <div class="card-item">
+                        <div class="card-thumb">
+                            <img class="card-thumb-img" src="{{ card.thumb_url }}" alt="Card {{ card.card_id }}">
+                            <img class="card-frame" src="{{ card.frame_url }}" alt="">
+                            <img class="card-attr" src="{{ powerful_icon_url }}" alt="">
+                            <img class="card-band" src="{{ card.band_icon_url }}" alt="">
+                            <div class="card-stars">
+                                {% for star in card.stars %}
+                                <img class="star-icon" src="{{ star.star_icon_url }}" alt="">
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="card-id">ID:{{ card.card_id }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-cards">暂无</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部提示 -->
+    <div class="footer-tip">
+        💡 如需查看某张卡面的详细信息，请输入 <code>/id {{ example_id }}</code> 进行查询
+    </div>
+    
+    <!-- 预加载脚本：确保所有图片加载完成 -->
+    <script>
+        // 图片加载完成后设置标记
+        window.imagesLoaded = false;
+        
+        function checkAllImagesLoaded() {
+            const images = document.querySelectorAll('img');
+            let loaded = 0;
+            let total = images.length;
+            
+            images.forEach(img => {
+                if (img.complete) {
+                    loaded++;
+                }
+            });
+            
+            if (loaded >= total) {
+                window.imagesLoaded = true;
+                document.body.setAttribute('data-images-loaded', 'true');
+            }
+        }
+        
+        // 页面加载后检查图片
+        window.onload = function() {
+            checkAllImagesLoaded();
+            // 每100ms检查一次，最多等待5秒
+            let attempts = 0;
+            const interval = setInterval(function() {
+                checkAllImagesLoaded();
+                attempts++;
+                if (window.imagesLoaded || attempts > 50) {
+                    clearInterval(interval);
+                }
+            }, 100);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最新卡面一览</title>
+    <style>
+        html, body {
+            height: fit-content;
+            width: 880px;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+            /* 游戏经典粉色波点背景 */
+            background-color: #fff0f5;
+            background-image: 
+                radial-gradient(#ffdae8 2px, transparent 2px),
+                radial-gradient(#ffdae8 2px, transparent 2px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            color: #333;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+        
+        .main-container {
+            max-width: 840px;
+            margin: 20px auto;
+            /* 主体背景 */
+            background: linear-gradient(180deg, #fffcfd 0%, #fff0f3 100%);
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            /* 左右增加装饰性边框 */
+            border-left: 8px solid #ffb7ce;
+            border-right: 8px solid #ffb7ce;
+        }
+        
+        /* =================== HEADER 区域 =================== */
+        .header-section {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        /* 标题构件 */
+        .header-badge {
+            width: 100%;
+            text-align: center;
+            background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+            padding: 25px 20px;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(233, 30, 99, 0.3);
+        }
+        
+        /* 添加斜纹装饰遮罩 */
+        .header-badge::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.1),
+                rgba(255, 255, 255, 0.1) 10px,
+                transparent 10px,
+                transparent 20px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .header-badge .title {
+            color: white;
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-shadow: 
+                0 2px 0px rgba(156, 39, 176, 1),
+                0 4px 8px rgba(0,0,0,0.2);
+            margin: 0;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .header-badge .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            margin-top: 8px;
+            letter-spacing: 1px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        /* =================== 卡面列表区域 =================== */
+        .cards-section {
+            padding: 30px;
+            background: linear-gradient(180deg, #faf8f5 0%, #f5f0e8 100%);
+        }
+        
+        /* 卡面内层表格 - 圆角白色容器 */
+        .cards-inner-table {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(212, 101, 138, 0.15);
+        }
+        
+        /* 单张卡面记录 */
+        .card-record {
+            margin-bottom: 25px;
+        }
+        
+        .card-record:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* 卡面图片行 - 特训前/后并排 */
+        .card-images-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+        
+        /* 单个卡面容器 */
+        .card-box {
+            position: relative;
+            flex: 1;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* 卡面图片 */
+        .card-box .card-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* 外框装饰层 */
+        .card-box .card-frame {
+            position: absolute;
+            top: -2%;
+            left: -1.5%;
+            width: 103%;
+            height: 104%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* 乐队图标 - 左上角 */
+        .card-box .card-band-icon {
+            position: absolute;
+            top: 3%;
+            left: 2%;
+            width: 10%;
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        /* 属性图标 - 右上角（与外框圆圈对齐） */
+        .card-box .card-attr-icon {
+            position: absolute;
+            top: 0.5%;
+            right: 0.5%;
+            width: 11%;
+            height: auto;
+            z-index: 15;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        
+        /* 星级 - 左下角竖排 */
+        .card-box .card-stars {
+            position: absolute;
+            bottom: 4%;
+            left: 0.5%;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            z-index: 15;
+        }
+        
+        .card-box .card-star-icon {
+            width: 16px;
+            height: 16px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+        }
+        
+        /* 特训标签 - 右下角 */
+        .card-box .card-tag {
+            position: absolute;
+            bottom: 4%;
+            right: 2%;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 15;
+            backdrop-filter: blur(4px);
+        }
+        
+        /* 卡面名称行 */
+        .card-name-row {
+            text-align: center;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #fff5f7 0%, #ffecf0 100%);
+            border-radius: 8px;
+            color: #5a3050;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            margin-top: 10px;
+        }
+        
+        .card-name-row .card-id {
+            font-family: Consolas, monospace;
+            background: #e0e0e0;
+            color: #555;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 12px;
+        }
+        
+        .card-name-row .rarity-badge {
+            color: #FFD700;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        /* =================== FOOTER 区域 =================== */
+        .copyright {
+            background: #6b3a5b;
+            color: #e8c4d4;
+            text-align: center;
+            padding: 16px 20px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            border-top: 4px solid #8b5a6b;
+        }
+        
+        /* 占位符 */
+        .placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- =================== HEADER: 标题区域 =================== -->
+        <div class="header-section">
+            <div class="header-badge">
+                <h1 class="title">{{ server_name }} 最新卡面一览</h1>
+                <p class="subtitle">来自最近 {{ event_count }} 个活动 | 共 {{ card_count }} 张新卡面</p>
+            </div>
+        </div>
+        
+        <!-- =================== CONTENT: 卡面列表区域 =================== -->
+        <div class="cards-section">
+            <div class="cards-inner-table">
+                {% for card in cards %}
+                <div class="card-record">
+                    <!-- 卡面图片行：特训前/特训后并排 -->
+                    <div class="card-images-row">
+                        <!-- 特训前卡面 -->
+                        <div class="card-box">
+                            {% if card.unidolized_image %}
+                            <img src="{{ card.unidolized_image }}" class="card-img" alt="特训前">
+                            {% endif %}
+                            <img src="{{ card.frame_url }}" class="card-frame">
+                            {% if card.band_icon %}
+                            <img src="{{ card.band_icon }}" class="card-band-icon">
+                            {% endif %}
+                            {% if card.attr_icon %}
+                            <img src="{{ card.attr_icon }}" class="card-attr-icon">
+                            {% endif %}
+                            <div class="card-stars">
+                                {% for i in range(card.rarity) %}
+                                <img src="https://bestdori.com/res/icon/star.png" class="card-star-icon">
+                                {% endfor %}
+                            </div>
+                            <div class="card-tag">特训前</div>
+                        </div>
+                        
+                        <!-- 特训后卡面（仅3星及以上）/ 二星及以下留空占位 -->
+                        {% if card.rarity >= 3 %}
+                        <div class="card-box">
+                            {% if card.idolized_image %}
+                            <img src="{{ card.idolized_image }}" class="card-img" alt="特训后">
+                            {% endif %}
+                            <img src="{{ card.frame_url }}" class="card-frame">
+                            {% if card.band_icon %}
+                            <img src="{{ card.band_icon }}" class="card-band-icon">
+                            {% endif %}
+                            {% if card.attr_icon %}
+                            <img src="{{ card.attr_icon }}" class="card-attr-icon">
+                            {% endif %}
+                            <div class="card-stars">
+                                {% for i in range(card.rarity) %}
+                                <img src="https://bestdori.com/res/icon/star_trained.png" class="card-star-icon">
+                                {% endfor %}
+                            </div>
+                            <div class="card-tag">特训后</div>
+                        </div>
+                        {% else %}
+                        <!-- 二星及以下：右侧留空占位 -->
+                        <div class="card-box" style="visibility: hidden;"></div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- 卡面名称行 -->
+                    <div class="card-name-row">
+                        <span class="card-id">ID: {{ card.card_id }}</span>
+                        {{ card.character_name }} - {{ card.title }}
+                        <span class="rarity-badge">★{{ card.rarity }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                {% if not cards %}
+                <div class="placeholder">
+                    暂无最新卡面数据
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- =================== FOOTER: 版权信息 =================== -->
+        <footer class="copyright">
+            Generated by AstrBot Bestdori Plugin | 发送 /id [卡面ID] 获取高清大图
+        </footer>
+    </div>
+</body>
+</html>

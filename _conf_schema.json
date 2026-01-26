@@ -1,0 +1,216 @@
+{
+  "admin_users": {
+    "description": "管理员QQ号列表",
+    "type": "list",
+    "default": [],
+    "hint": "填写管理员的QQ号，只有管理员才能使用 /admin 命令。如 ['123456789', '987654321']"
+  },
+  "default_server": {
+    "description": "默认服务器",
+    "type": "string",
+    "default": "cn",
+    "hint": "查询时默认使用的服务器。可选: cn(国服), jp(日服), en(国际服), tw(台服), kr(韩服)"
+  },
+  "server_fallback": {
+    "description": "启用服务器回退",
+    "type": "bool",
+    "default": true,
+    "hint": "当默认服务器没有某资源时，自动尝试其他服务器获取"
+  },
+  "cache_dir": {
+    "description": "缓存目录路径",
+    "type": "string",
+    "default": "",
+    "hint": "HTML卡片渲染输出的PNG缓存目录。留空使用默认目录（插件所在目录/data/bestdori_tools/cache）"
+  },
+  "download_dir": {
+    "description": "下载目录路径",
+    "type": "string",
+    "default": "",
+    "hint": "资源下载保存目录（卡面、语音、故事、素材等）。留空使用默认目录（插件所在目录/data/bestdori_tools/downloads）"
+  },
+  "broadcast_enabled": {
+    "description": "是否启用定时播报功能",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后将自动推送生日祝福、活动提醒、热点资讯等内容"
+  },
+  "broadcast_reset_state": {
+    "description": "重置播报状态（调试用）",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后将在下次启动时清除今日已播报标记，强制重新播报。测试完成后请关闭此选项。"
+  },
+  "broadcast_empty_notify": {
+    "description": "无内容时发送通知",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后即使当天没有生日/资讯，也会发送通知消息，用于测试播报功能是否正常运行"
+  },
+  "broadcast_to_console": {
+    "description": "是否推送到AstrBot后台",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后播报内容将显示在AstrBot管理后台日志中"
+  },
+  "broadcast_platform": {
+    "description": "指定发送消息的平台（可选）",
+    "type": "string",
+    "default": "",
+    "hint": "通常无需设置，插件会自动识别并选择你连接的 QQ 平台。如果有多个平台，可手动指定平台ID。"
+  },
+  "broadcast_to_groups": {
+    "description": "是否推送到群组",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后播报内容将发送到配置的群组"
+  },
+  "broadcast_groups": {
+    "description": "接收播报的群组ID列表",
+    "type": "list",
+    "default": [],
+    "hint": "填写需要接收播报的群组ID，如 ['123456789', '987654321']"
+  },
+  "broadcast_to_users": {
+    "description": "是否推送到订阅用户",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后播报内容将发送给所有订阅用户。用户通过与 bot 互动自动订阅，或发送 /bd subscribe 手动订阅。管理员可发送 /bd admin subscribers 查看订阅列表。"
+  },
+  "broadcast_users_blacklist": {
+    "description": "用户播报黑名单",
+    "type": "list",
+    "default": [],
+    "hint": "填写不需要接收播报的用户QQ号，这些用户即使订阅也不会收到播报。"
+  },
+  "birthday_broadcast": {
+    "description": "生日祝福播报配置",
+    "type": "object",
+    "hint": "在角色生日当天的指定时间自动发送祝福消息",
+    "items": {
+      "enabled": {
+        "description": "是否启用生日祝福",
+        "type": "bool",
+        "default": true,
+        "hint": "启用后将在角色生日当天自动发送祝福消息"
+      },
+      "broadcast_hour": {
+        "description": "播报时间 - 小时",
+        "type": "int",
+        "default": 0,
+        "hint": "播报时间的小时部分，0-23之间的整数"
+      },
+      "broadcast_minute": {
+        "description": "播报时间 - 分钟",
+        "type": "int",
+        "default": 0,
+        "hint": "播报时间的分钟部分，0-59之间的整数"
+      }
+    }
+  },
+  "event_broadcast": {
+    "description": "活动播报配置",
+    "type": "object",
+    "hint": "活动开始前后自动推送活动预告和一览",
+    "items": {
+      "enabled": {
+        "description": "是否启用活动播报",
+        "type": "bool",
+        "default": true,
+        "hint": "启用后将自动推送活动预告和活动一览"
+      },
+      "preview_enabled": {
+        "description": "是否启用活动预告",
+        "type": "bool",
+        "default": true,
+        "hint": "启用后在活动开始前发送预告提醒"
+      },
+      "preview_hours_before": {
+        "description": "活动开始前提醒时间（小时）",
+        "type": "int",
+        "default": 12,
+        "hint": "活动开始前多少小时发送预告提醒"
+      },
+      "overview_enabled": {
+        "description": "是否启用活动一览",
+        "type": "bool",
+        "default": true,
+        "hint": "启用后在活动开始后发送活动一览图"
+      },
+      "overview_hours_after": {
+        "description": "活动开始后发送一览时间（小时）",
+        "type": "int",
+        "default": 12,
+        "hint": "活动开始后多少小时发送活动一览图"
+      }
+    }
+  },
+  "news_broadcast": {
+    "description": "热点资讯播报配置",
+    "type": "object",
+    "hint": "每天在指定时间自动推送当天最新的国服资讯",
+    "items": {
+      "enabled": {
+        "description": "是否启用资讯播报",
+        "type": "bool",
+        "default": true,
+        "hint": "启用后将每天自动推送当天最新资讯"
+      },
+      "broadcast_hour": {
+        "description": "播报时间 - 小时",
+        "type": "int",
+        "default": 9,
+        "hint": "播报时间的小时部分，0-23之间的整数"
+      },
+      "broadcast_minute": {
+        "description": "播报时间 - 分钟",
+        "type": "int",
+        "default": 0,
+        "hint": "播报时间的分钟部分，0-59之间的整数"
+      }
+    }
+  },
+  "cache_enabled": {
+    "description": "是否启用缓存系统",
+    "type": "bool",
+    "default": true,
+    "hint": "启用后将缓存查询结果（活动、卡面、生日等），提升二次查询的响应速度"
+  },
+  "cache_max_size": {
+    "description": "缓存最大大小（MB）",
+    "type": "int",
+    "default": 1024,
+    "hint": "缓存文件总大小超过此值时将自动清理最久未使用的文件。默认 1024 MB（1GB）"
+  },
+  "cache_event_ttl": {
+    "description": "活动缓存过期时间（小时）",
+    "type": "int",
+    "default": 24,
+    "hint": "活动查询结果缓存保留时间，默认 24 小时"
+  },
+  "cache_card_ttl": {
+    "description": "卡面缓存过期时间（天）",
+    "type": "int",
+    "default": 7,
+    "hint": "卡面查询结果缓存保留时间，默认 7 天"
+  },
+  "cache_birthday_ttl": {
+    "description": "生日缓存过期时间（天）",
+    "type": "int",
+    "default": 30,
+    "hint": "生日卡片缓存保留时间，默认 30 天"
+  },
+  "cache_cleanup_interval": {
+    "description": "缓存清理间隔（小时）",
+    "type": "int",
+    "default": 24,
+    "hint": "多久检查一次缓存是否需要清理，默认 24 小时"
+  }
+  ,
+  "admin_qq_list": {
+    "description": "管理员QQ号列表",
+    "type": "list",
+    "default": [],
+    "hint": "填写拥有管理权限的QQ号列表，如 ['12345678', '87654321']，仅这些用户可使用/admin及相关管理功能"
+  }
+}

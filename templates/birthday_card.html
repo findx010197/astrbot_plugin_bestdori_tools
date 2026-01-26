@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生日快乐 - {{ character_name }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            /* 透明背景，让html2image只捕获容器 */
+            background: transparent; 
+            padding: 0;
+            margin: 0;
+            display: inline-block; /* 适应内容大小 */
+        }
+        
+        .card-container {
+            width: 800px;
+            background: #fff;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            font-family: 'Noto Sans SC', sans-serif;
+            position: relative;
+        }
+        
+        /* 头部区域: 小人 + 文本 */
+        .header-section {
+            padding: 30px 40px;
+            display: flex;
+            align-items: center;
+            background: #fdfdfd;
+            border-bottom: 2px dashed #eee;
+        }
+        
+        .chibi-wrapper {
+            width: 120px;
+            height: 120px;
+            flex-shrink: 0;
+            margin-right: 30px;
+            position: relative;
+        }
+        
+        .chibi-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1));
+        }
+        
+        .voice-text-wrapper {
+            flex-grow: 1;
+            position: relative;
+        }
+        
+        /* 对话框样式 - 更加醒目 */
+        .speech-bubble {
+            background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+            border: 3px solid {{ text_color }};
+            border-radius: 25px;
+            padding: 25px 35px;
+            position: relative;
+            color: {{ text_color }}; /* 随机主题色 */
+            font-family: 'Ma Shan Zheng', cursive, 'Noto Sans SC', sans-serif;
+            font-size: 32px; /* 更大字号 */
+            line-height: 1.4;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            text-shadow: 1px 1px 0px rgba(0,0,0,0.05);
+        }
+        
+        .speech-bubble::before {
+            content: '';
+            position: absolute;
+            left: -23px; /* 调整箭头位置 */
+            top: 50%;
+            transform: translateY(-50%);
+            border-style: solid;
+            border-width: 12px 20px 12px 0;
+            border-color: transparent {{ text_color }} transparent transparent;
+        }
+        
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            left: -18px; /* 内部白色箭头 */
+            top: 50%;
+            transform: translateY(-50%);
+            border-style: solid;
+            border-width: 12px 20px 12px 0;
+            border-color: transparent #fff transparent transparent;
+        }
+        
+        /* 装饰音符 */
+        .note-decor {
+            position: absolute;
+            top: -15px;
+            right: -10px;
+            font-size: 30px;
+            color: {{ text_color }};
+            transform: rotate(15deg);
+            opacity: 0.8;
+        }
+        
+        /* 卡面区域 */
+        .card-section {
+            padding: 20px;
+            position: relative;
+        }
+        
+        .card-wrapper {
+            width: 100%;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            /* 自适应裁剪 */
+        }
+        
+        .card-img {
+            width: 100%;
+            display: block;
+            /* 限制最大高度，避免卡面过长 */
+            max-height: 600px;
+            object-fit: cover;
+            object-position: top center;
+        }
+        
+        /* 生日快乐艺术字叠加 */
+        .birthday-overlay {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            font-family: 'Ma Shan Zheng', cursive, sans-serif;
+            font-size: 70px;
+            color: #fff;
+            text-shadow: 
+                3px 3px 0px {{ text_color }}, 
+                -1px -1px 0px {{ text_color }},  
+                1px -1px 0px {{ text_color }},
+                -1px 1px 0px {{ text_color }},
+                1px 1px 0px {{ text_color }},
+                5px 5px 15px rgba(0,0,0,0.4);
+            transform: rotate(-8deg);
+            z-index: 10;
+            opacity: 0.95;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="card-container">
+        <!-- 头部: 小人 + 文本 -->
+        <div class="header-section">
+            <div class="chibi-wrapper">
+                {% if chibi_url %}
+                <img src="{{ chibi_url }}" class="chibi-img" alt="chibi">
+                {% else %}
+                <div style="width:100%;height:100%;background:#eee;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;">🎂</div>
+                {% endif %}
+            </div>
+            
+            <div class="voice-text-wrapper">
+                <div class="speech-bubble">
+                    <div class="note-decor">♪</div>
+                    {% if birthday_text %}
+                    {{ birthday_text }}
+                    {% else %}
+                    今天是我的生日，谢谢你的祝福！
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 卡面区域 -->
+        <div class="card-section">
+            <div class="card-wrapper">
+                {% if card_image_url %}
+                <img src="{{ card_image_url }}" class="card-img" alt="Birthday Card">
+                <div class="birthday-overlay">Happy Birthday!</div>
+                {% else %}
+                <div style="padding:100px;text-align:center;color:#999;">暂无卡面图片</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

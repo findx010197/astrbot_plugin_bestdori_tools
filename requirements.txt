@@ -1,0 +1,14 @@
+# AstrBot Bestdori Tools Plugin - 依赖列表
+# 版本: 1.2.0
+
+# === 核心依赖 ===
+aiohttp>=3.8.0          # 异步HTTP客户端，用于API请求和图片下载
+jinja2>=3.1.0           # HTML模板引擎
+pillow>=9.0.0           # 图片处理（裁剪、合成等）
+
+# === 渲染依赖 ===
+html2image>=2.0.0       # HTML转图片渲染
+
+# === 可选依赖（语音功能）===
+# pydub>=0.25.0         # 音频处理（需要FFmpeg）
+# ffmpeg-python>=0.2.0  # FFmpeg Python绑定
