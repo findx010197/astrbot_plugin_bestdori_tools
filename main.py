@@ -684,7 +684,7 @@ class BestdoriPlugin(Star):
         logger.info("✅ Bestdori 插件已完全停止")
 
     @filter.command("bd")
-    async def bestdori(self, event: AstrMessageEvent):
+    async def bestdori(self, event: AstrMessageEvent, *args):
         """Bestdori 插件统一入口 - 三级菜单系统"""
         # 记录用户活动（自动订阅播报）
         try:
@@ -714,14 +714,17 @@ class BestdoriPlugin(Star):
         except Exception as e:
             logger.debug(f"记录用户活动失败: {e}")
 
-        # 解析命令参数 - 从消息文本中提取
-        full_text = event.message_str.strip()
-        parts = full_text.split()
-
-        # 移除触发词前缀，获取参数列表
-        cmd_parts = []
-        if len(parts) > 0 and parts[0].lower() in ["/bd", "bd"]:
-            cmd_parts = [p.lower() for p in parts[1:]]
+        # 解析命令参数 - 优先使用框架传递的参数
+        if args:
+            cmd_parts = [str(a).lower() for a in args]
+        else:
+            # 回退到从消息文本解析
+            full_text = event.message_str.strip()
+            parts = full_text.split()
+            # 移除触发词前缀，获取参数列表
+            cmd_parts = []
+            if len(parts) > 0 and parts[0].lower() in ["/bd", "bd"]:
+                cmd_parts = [p.lower() for p in parts[1:]]
 
         # 分发到三级菜单处理
         async for result in self._dispatch_menu(event, cmd_parts):
