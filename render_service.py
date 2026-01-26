@@ -22,6 +22,9 @@ class RenderService:
 
         # 尝试自动查找浏览器路径
         self._detect_browser()
+        
+        # 检测中文字体
+        self._check_chinese_fonts()
 
     def _detect_browser(self):
         """检测可用的浏览器"""
@@ -51,6 +54,35 @@ class RenderService:
 
         logger.warning("未检测到 Chrome/Chromium 浏览器，图片渲染功能可能不可用")
 
+    def _check_chinese_fonts(self):
+        """检测系统是否安装了中文字体"""
+        if sys.platform.startswith("win"):
+            # Windows 通常有中文字体支持
+            return
+        
+        # Linux: 检查常见的中文字体文件
+        font_paths = [
+            "/usr/share/fonts/opentype/noto",  # Noto CJK
+            "/usr/share/fonts/truetype/noto",
+            "/usr/share/fonts/truetype/wqy",   # 文泉驿
+            "/usr/share/fonts/truetype/droid", # Droid
+            "/usr/share/fonts/noto-cjk",       # Alpine
+        ]
+        
+        has_chinese_font = False
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                has_chinese_font = True
+                logger.info(f"检测到中文字体目录: {font_path}")
+                break
+        
+        if not has_chinese_font:
+            logger.warning(
+                "⚠️ 未检测到中文字体，渲染的图片中文可能显示为方块！\n"
+                "请安装中文字体: apt-get install -y fonts-noto-cjk fonts-wqy-microhei\n"
+                "然后运行: fc-cache -fv"
+            )
+
     @property
     def hti(self) -> Html2Image:
         """惰性加载 Html2Image 实例"""
@@ -61,6 +93,9 @@ class RenderService:
                 "--log-level=3",
                 "--no-sandbox",  # Docker 环境需要
                 "--disable-dev-shm-usage",  # Docker 环境需要
+                "--lang=zh-CN",  # 设置语言为中文
+                "--font-render-hinting=none",  # 禁用字体 hinting，改善渲染
+                "--force-color-profile=srgb",  # 强制颜色配置
             ]
             try:
                 if self._browser_path:
@@ -75,7 +110,8 @@ class RenderService:
                 self._chrome_available = False
                 raise RuntimeError(
                     "图片渲染需要 Chrome/Chromium 浏览器。\n"
-                    "Docker 用户请安装 chromium: apt-get install -y chromium\n"
+                    "Docker 用户请安装 chromium 和中文字体:\n"
+                    "apt-get install -y chromium fonts-noto-cjk\n"
                     "或使用包含 Chrome 的镜像。"
                 ) from e
         return self._hti
@@ -104,12 +140,63 @@ class RenderService:
         template = self.env.get_template(template_name)
         return template.render(**kwargs)
 
+    def _inject_font_fallback(self, html_content: str) -> str:
+        """
+        为 HTML 注入中文字体回退支持
+        使用纯 CSS 字体栈确保在各种环境中都能正确渲染中文
+        
+        Args:
+            html_content: 原始 HTML 内容
+            
+        Returns:
+            注入字体支持后的 HTML
+        """
+        # 字体 CSS - 使用完整的中文字体回退栈
+        # 优先级：Noto Sans CJK (Linux) > 苹方 (Mac) > 微软雅黑 (Windows) > 文泉驿 (Linux) > 黑体 (通用)
+        font_css = '''
+<style id="bestdori-font-fallback">
+/* 中文字体回退栈 - 覆盖所有操作系统 */
+:root {
+    --zh-font-stack: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", 
+                     "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", 
+                     "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", 
+                     "Droid Sans Fallback", "SimHei", "STHeiti", 
+                     "Heiti SC", sans-serif;
+}
+
+/* 全局字体强制覆盖 */
+html, body, div, span, p, h1, h2, h3, h4, h5, h6, 
+a, label, input, button, textarea, select, 
+table, tr, td, th, li, ul, ol {
+    font-family: var(--zh-font-stack) !important;
+}
+
+/* 确保 CJK 字符不会被替换为方块 */
+@supports (font-family: "Noto Sans CJK SC") {
+    * {
+        font-family: "Noto Sans CJK SC", var(--zh-font-stack) !important;
+    }
+}
+</style>
+'''
+        # 在 <head> 标签后注入字体 CSS
+        if '<head>' in html_content:
+            html_content = html_content.replace('<head>', '<head>' + font_css, 1)
+        elif '<HEAD>' in html_content:
+            html_content = html_content.replace('<HEAD>', '<HEAD>' + font_css, 1)
+        else:
+            # 如果没有 head 标签，在开头添加
+            html_content = font_css + html_content
+            
+        return html_content
+
     async def html_to_image(
         self,
         html_content: str,
         prefix: str = "render",
         width: int = 900,
         output_path: str = None,
+        inject_fonts: bool = True,
     ) -> str:
         """
         将HTML内容转换为图片
@@ -119,6 +206,7 @@ class RenderService:
             prefix: 输出文件名前缀
             width: 渲染宽度（默认900，横向布局可设置更大）
             output_path: 指定输出文件的绝对路径（如果指定则忽略 prefix）
+            inject_fonts: 是否注入字体回退支持（默认 True）
 
         Returns:
             图片文件的绝对路径
@@ -126,6 +214,10 @@ class RenderService:
         Raises:
             RuntimeError: 当 Chrome/Chromium 不可用时
         """
+        # 注入字体回退支持
+        if inject_fonts:
+            html_content = self._inject_font_fallback(html_content)
+        
         # 检查渲染功能是否可用
         if not self.is_render_available():
             raise RuntimeError(

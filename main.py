@@ -3452,68 +3452,45 @@ class BestdoriPlugin(Star):
                 yield event.plain_result("⚠️ 没有可用的生日卡片")
                 return
 
-            # 准备渲染数据
-            # 优先使用本地卡面，如果不存在则使用URL
-            card_url = selected_card.get("local_card_path") or selected_card.get(
-                "card_image_url", ""
-            )
-
-            # 如果是本地路径，转换为 base64 data URI（headless Chrome 中 file:// 可能无法加载）
-            if card_url and os.path.isabs(card_url) and os.path.exists(card_url):
-                import base64
-                try:
-                    with open(card_url, "rb") as f:
-                        card_data = base64.b64encode(f.read()).decode("utf-8")
-                    card_url = f"data:image/png;base64,{card_data}"
-                except Exception as e:
-                    logger.warning(f"转换卡面图片为 base64 失败: {e}")
-                    # 回退到 file URI
-                    from pathlib import Path
-                    card_url = Path(card_url).as_uri()
-
-            # 获取小人图标路径并转换为 base64
             char_id = birthday_data.get("character_id")
-            chibi_path = (
-                self.birthday_service.data_dir
-                / "assets"
-                / "chibi"
-                / f"chibi_{char_id}.png"
-            )
-            chibi_url = ""
+
+            # 收集需要预加载的图片 URL
+            urls_to_preload = []
             
-            # 如果 chibi 图标不存在，尝试下载
-            if not chibi_path.exists():
-                logger.info(f"Chibi 图标不存在，尝试下载: char_{char_id}")
-                chibi_path.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    import aiohttp
-                    download_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
-                        async with session.get(download_url) as resp:
-                            if resp.status == 200:
-                                with open(chibi_path, "wb") as f:
-                                    f.write(await resp.read())
-                                logger.info(f"成功下载 chibi 图标: char_{char_id}")
-                except Exception as e:
-                    logger.warning(f"下载 chibi 图标失败: {e}")
+            # 卡面图片 URL
+            card_url = selected_card.get("card_image_url", "")
+            local_card_path = selected_card.get("local_card_path")
             
-            if chibi_path.exists():
+            # 如果有本地卡面，转换为 base64
+            if local_card_path and os.path.isabs(local_card_path) and os.path.exists(local_card_path):
                 import base64
                 try:
-                    with open(chibi_path, "rb") as f:
-                        chibi_data = base64.b64encode(f.read()).decode("utf-8")
-                    chibi_url = f"data:image/png;base64,{chibi_data}"
-                    logger.debug(f"已将 chibi 图标转换为 base64: char_{char_id}")
+                    with open(local_card_path, "rb") as f:
+                        card_data_b64 = base64.b64encode(f.read()).decode("utf-8")
+                    card_url = f"data:image/png;base64,{card_data_b64}"
+                    logger.debug(f"已将本地卡面转换为 base64: {local_card_path}")
                 except Exception as e:
-                    logger.warning(f"转换 chibi 图标为 base64 失败: {e}")
-                    # 回退到远程 URL
-                    chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-            else:
-                logger.warning(f"Chibi 图标仍不存在，使用远程 URL: {chibi_path}")
-                chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                    logger.warning(f"转换本地卡面为 base64 失败: {e}，使用远程 URL")
+                    if card_url:
+                        urls_to_preload.append(card_url)
+            elif card_url:
+                urls_to_preload.append(card_url)
+            
+            # Chibi 图标 URL（直接从远程加载，最可靠）
+            chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+            urls_to_preload.append(chibi_url)
+            
+            # 预加载所有远程图片
+            image_cache = {}
+            if urls_to_preload:
+                image_cache = await self._preload_images_as_base64(urls_to_preload)
+            
+            # 获取预加载后的图片
+            if not card_url.startswith("data:"):
+                card_url = image_cache.get(card_url) or card_url
+            chibi_url = image_cache.get(chibi_url) or chibi_url
 
             # 从角色数据库或卡面图像中获取主题色
-            char_id = birthday_data.get("character_id")
             text_color = color_extractor.extract_character_color(str(char_id), card_url)
 
             render_data = {
