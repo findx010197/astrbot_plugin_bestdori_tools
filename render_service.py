@@ -4,6 +4,9 @@ from html2image import Html2Image
 from typing import Dict, Any
 import sys
 from PIL import Image
+import logging
+
+logger = logging.getLogger("bestdori_render")
 
 
 class RenderService:
@@ -12,8 +15,17 @@ class RenderService:
         self.output_dir = output_dir  # 渲染图片输出目录
         self.env = Environment(loader=FileSystemLoader(template_dir))
 
-        # 尝试自动查找浏览器路径 (Windows)
-        browser_path = None
+        # 延迟初始化 Html2Image，避免在 Docker 等无 Chrome 环境中崩溃
+        self._hti = None
+        self._browser_path = None
+        self._chrome_available = None  # None 表示未检测
+
+        # 尝试自动查找浏览器路径
+        self._detect_browser()
+
+    def _detect_browser(self):
+        """检测可用的浏览器"""
+        # Windows 路径
         if sys.platform.startswith("win"):
             potential_paths = [
                 r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -21,18 +33,62 @@ class RenderService:
                 r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
                 r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
             ]
-            for path in potential_paths:
-                if os.path.exists(path):
-                    browser_path = path
-                    break
-
-        # 初始化 Html2Image
-        flags = ["--hide-scrollbars", "--disable-gpu", "--log-level=3"]
-        if browser_path:
-            self.hti = Html2Image(browser_executable=browser_path, custom_flags=flags)
+        # Linux 路径 (Docker 环境)
         else:
-            # 让库自己尝试查找
-            self.hti = Html2Image(custom_flags=flags)
+            potential_paths = [
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/snap/bin/chromium",
+            ]
+
+        for path in potential_paths:
+            if os.path.exists(path):
+                self._browser_path = path
+                logger.info(f"检测到浏览器: {path}")
+                return
+
+        logger.warning("未检测到 Chrome/Chromium 浏览器，图片渲染功能可能不可用")
+
+    @property
+    def hti(self) -> Html2Image:
+        """惰性加载 Html2Image 实例"""
+        if self._hti is None:
+            flags = [
+                "--hide-scrollbars",
+                "--disable-gpu",
+                "--log-level=3",
+                "--no-sandbox",  # Docker 环境需要
+                "--disable-dev-shm-usage",  # Docker 环境需要
+            ]
+            try:
+                if self._browser_path:
+                    self._hti = Html2Image(
+                        browser_executable=self._browser_path, custom_flags=flags
+                    )
+                else:
+                    self._hti = Html2Image(custom_flags=flags)
+                self._chrome_available = True
+            except FileNotFoundError as e:
+                logger.error(f"Chrome/Chromium 未找到: {e}")
+                self._chrome_available = False
+                raise RuntimeError(
+                    "图片渲染需要 Chrome/Chromium 浏览器。\n"
+                    "Docker 用户请安装 chromium: apt-get install -y chromium\n"
+                    "或使用包含 Chrome 的镜像。"
+                ) from e
+        return self._hti
+
+    def is_render_available(self) -> bool:
+        """检查渲染功能是否可用"""
+        if self._chrome_available is not None:
+            return self._chrome_available
+        try:
+            _ = self.hti
+            return True
+        except RuntimeError:
+            return False
 
     def render_template(self, template_name: str, **kwargs) -> str:
         """
@@ -66,7 +122,19 @@ class RenderService:
 
         Returns:
             图片文件的绝对路径
+
+        Raises:
+            RuntimeError: 当 Chrome/Chromium 不可用时
         """
+        # 检查渲染功能是否可用
+        if not self.is_render_available():
+            raise RuntimeError(
+                "图片渲染功能不可用：未找到 Chrome/Chromium 浏览器。\n"
+                "Docker 用户解决方案：\n"
+                "1. 在 Dockerfile 中添加: RUN apt-get update && apt-get install -y chromium\n"
+                "2. 或使用包含 Chrome 的基础镜像"
+            )
+
         import tempfile
         import uuid
 

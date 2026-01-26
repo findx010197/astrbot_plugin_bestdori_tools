@@ -69,10 +69,25 @@ BanG Dream! 少女乐团派对 游戏信息查询工具插件，基于 [Bestdori
 ### 系统要求
 
 - **Python**: 3.9+
-- **浏览器**: Chrome 或 Edge（用于 HTML 渲染）
+- **浏览器**: Chrome 或 Chromium（用于 HTML 渲染）
 - **网络**: 需要访问 bestdori.com
 
 > 💡 插件启动时会自动检查依赖和浏览器环境，缺失时会尝试自动安装
+
+### Docker 环境注意事项
+
+如果你使用 Docker 部署 AstrBot，需要确保容器中安装了 Chromium 浏览器：
+
+```dockerfile
+# 在 Dockerfile 中添加
+RUN apt-get update && apt-get install -y chromium chromium-driver
+```
+
+或者在运行容器后手动安装：
+```bash
+docker exec -it <container_name> apt-get update
+docker exec -it <container_name> apt-get install -y chromium
+```
 
 ## 🚀 使用方法
 
