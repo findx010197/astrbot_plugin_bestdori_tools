@@ -9,6 +9,9 @@ except ImportError:
 
 logger = logging.getLogger("astrbot_plugin_bestdori_tools")
 
+# 基础素材 URL 基地址
+BESTDORI_ICON_BASE = "https://bestdori.com/res/icon"
+
 # 资源定义
 BAND_ICON_URL_MAP = {
     1: "band_1.svg",
@@ -35,32 +38,39 @@ class ResourceManager:
         for subdir in ["bands", "attributes", "stars", "chibi"]:
             (self.assets_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-    async def _download_file(self, url: str, path: Path) -> bool:
+    async def _download_file(self, url: str, path: Path, force: bool = False) -> bool:
         """
         下载文件的私有方法
 
         Args:
             url: 下载URL
             path: 保存路径
+            force: 是否强制重新下载
 
         Returns:
             是否下载成功
         """
-        if path.exists() and path.stat().st_size > 0:
+        if not force and path.exists() and path.stat().st_size > 0:
+            logger.debug(f"文件已存在，跳过下载: {path}")
             return True  # 文件已存在且不为空
 
         try:
-            async with aiohttp.ClientSession() as session:
+            logger.info(f"正在下载: {url} -> {path}")
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         path.parent.mkdir(parents=True, exist_ok=True)
+                        content = await resp.read()
                         with open(path, "wb") as f:
-                            f.write(await resp.read())
+                            f.write(content)
+                        logger.info(f"下载成功: {path.name} ({len(content)} bytes)")
                         return True
                     else:
-                        print(f"下载失败 {url}: HTTP {resp.status}")
+                        logger.warning(f"下载失败 {url}: HTTP {resp.status}")
+        except aiohttp.ClientError as e:
+            logger.error(f"网络错误 {url}: {e}")
         except Exception as e:
-            print(f"下载异常 {url}: {e}")
+            logger.error(f"下载异常 {url}: {e}")
 
         return False
 
@@ -86,60 +96,79 @@ class ResourceManager:
             check_existing: 是否检查已存在的文件，跳过下载
         """
         try:
-            print("📥 下载基础素材...")
+            logger.info("📥 开始下载基础素材...")
 
             # 创建目录
-            (self.assets_dir / "attributes").mkdir(parents=True, exist_ok=True)
-            (self.assets_dir / "stars").mkdir(parents=True, exist_ok=True)
-            (self.assets_dir / "chibi").mkdir(parents=True, exist_ok=True)
-            (self.assets_dir / "bands").mkdir(parents=True, exist_ok=True)
+            for subdir in ["attributes", "stars", "chibi", "bands"]:
+                (self.assets_dir / subdir).mkdir(parents=True, exist_ok=True)
+
+            success_count = 0
+            fail_count = 0
 
             # 下载属性图标
             attributes = ["happy", "cool", "pure", "powerful"]
             for attr in attributes:
                 file_path = self.assets_dir / "attributes" / f"{attr}.svg"
-                if check_existing and file_path.exists():
-                    continue  # 跳过已存在的文件
+                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
 
-                url = f"https://bestdori.com/res/icon/{attr}.svg"
-                await self._download_file(url, file_path)
+                url = f"{BESTDORI_ICON_BASE}/{attr}.svg"
+                if await self._download_file(url, file_path):
+                    success_count += 1
+                else:
+                    fail_count += 1
 
             # 下载星级图标
             star_files = [
-                ("star.png", "https://bestdori.com/res/icon/star.png"),
-                ("star_trained.png", "https://bestdori.com/res/icon/star_trained.png"),
+                ("star.png", f"{BESTDORI_ICON_BASE}/star.png"),
+                ("star_trained.png", f"{BESTDORI_ICON_BASE}/star_trained.png"),
             ]
             for filename, url in star_files:
                 file_path = self.assets_dir / "stars" / filename
-                if check_existing and file_path.exists():
-                    continue  # 跳过已存在的文件
+                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
 
-                await self._download_file(url, file_path)
+                if await self._download_file(url, file_path):
+                    success_count += 1
+                else:
+                    fail_count += 1
 
             # 下载乐队图标
             for band_id, svg_name in BAND_ICON_URL_MAP.items():
                 file_path = self.assets_dir / "bands" / f"band_{band_id}.svg"
-                if check_existing and file_path.exists():
-                    continue  # 跳过已存在的文件
+                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
 
-                url = f"https://bestdori.com/res/icon/{svg_name}"
-                await self._download_file(url, file_path)
+                url = f"{BESTDORI_ICON_BASE}/{svg_name}"
+                if await self._download_file(url, file_path):
+                    success_count += 1
+                else:
+                    fail_count += 1
 
-            # 下载常用角色小人（可选）
+            # 下载常用角色小人
             common_chars = [1, 21, 39, 16, 27]  # 几个主要角色
             for char_id in common_chars:
                 file_path = self.assets_dir / "chibi" / f"chibi_{char_id}.png"
-                if check_existing and file_path.exists():
-                    continue  # 跳过已存在的文件
+                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
 
-                url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-                await self._download_file(url, file_path)
+                url = f"{BESTDORI_ICON_BASE}/chara_icon_{char_id}.png"
+                if await self._download_file(url, file_path):
+                    success_count += 1
+                else:
+                    fail_count += 1
 
-            print("✅ 基础素材下载完成")
-            return True
+            logger.info(f"✅ 基础素材下载完成: 成功 {success_count}, 失败 {fail_count}")
+            return fail_count == 0
 
         except Exception as e:
-            print(f"❌ 基础素材下载失败: {e}")
+            logger.error(f"❌ 基础素材下载失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     async def check_resource_integrity(self) -> dict:
@@ -319,39 +348,71 @@ class ResourceManager:
     async def first_run_check(self):
         """
         首次运行时的资源检查
-        如果是第一次运行或资源不完整，自动下载
+        始终检查关键资源是否存在，缺失则下载
         """
         try:
-            print("🔍 执行首次运行检查...")
+            logger.info("🔍 执行资源完整性检查...")
 
-            # 检查是否为首次运行
-            flag_file = self.assets_dir / ".initialized"
-            is_first_run = not flag_file.exists()
+            # 直接检查基础素材是否存在（不依赖标记文件）
+            basic_ok = self._quick_check_basic_assets()
 
-            if is_first_run:
-                print("📦 检测到首次运行，正在初始化资源...")
-                await self.download_all_resources()
-
-                # 创建初始化标记文件
-                flag_file.touch()
-                print("✅ 插件初始化完成")
+            if not basic_ok:
+                logger.info("📦 检测到缺失基础素材，正在下载...")
+                await self.download_basic_assets(check_existing=True)
             else:
-                # 非首次运行，仅检查关键资源
-                print("🔍 检查关键资源...")
-                integrity_report = await self.check_resource_integrity()
+                logger.info("✅ 基础素材完整")
 
-                # 如果缺失关键资源，自动补充
-                if (
-                    integrity_report["missing_basic"]
-                    or integrity_report["missing_birthday"]
-                ):
-                    print("⚠️ 检测到缺失资源，正在自动补充...")
-                    await self.download_missing_resources(integrity_report)
-                else:
-                    print("✅ 资源完整，无需下载")
+            # 检查完整性报告（可选，用于详细诊断）
+            integrity_report = await self.check_resource_integrity()
+
+            if integrity_report["missing_basic"]:
+                logger.warning(f"⚠️ 仍有缺失的基础素材: {integrity_report['missing_basic']}")
+            if integrity_report["missing_birthday"]:
+                logger.info(f"📝 缺失生日资源的角色: {integrity_report['missing_birthday']}（将在查询时按需下载）")
+
+            logger.info("✅ 资源检查完成")
 
         except Exception as e:
-            print(f"❌ 首次运行检查失败: {e}")
+            logger.error(f"❌ 资源检查失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _quick_check_basic_assets(self) -> bool:
+        """
+        快速检查关键基础素材是否存在
+
+        Returns:
+            True 如果所有关键素材都存在
+        """
+        # 检查属性图标（必需）
+        for attr in ATTRIBUTES:
+            attr_file = self.assets_dir / "attributes" / f"{attr}.svg"
+            if not attr_file.exists() or attr_file.stat().st_size == 0:
+                logger.debug(f"缺失属性图标: {attr_file}")
+                return False
+
+        # 检查星级图标（必需）
+        for star_file in ["star.png", "star_trained.png"]:
+            star_path = self.assets_dir / "stars" / star_file
+            if not star_path.exists() or star_path.stat().st_size == 0:
+                logger.debug(f"缺失星级图标: {star_path}")
+                return False
+
+        return True
+
+    async def ensure_basic_assets(self) -> bool:
+        """
+        确保基础素材存在，如果不存在则下载
+        供其他模块调用以确保渲染前资源就绪
+
+        Returns:
+            True 如果素材可用
+        """
+        if self._quick_check_basic_assets():
+            return True
+
+        logger.info("⚠️ 基础素材不完整，正在下载...")
+        return await self.download_basic_assets(check_existing=True)
 
     async def download_all_resources(self):
         """

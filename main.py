@@ -2115,6 +2115,9 @@ class BestdoriPlugin(Star):
         """
         import random
 
+        # 确保基础素材存在
+        await self.resource_manager.ensure_basic_assets()
+
         server_name = SERVER_NAME_MAP.get(server, "未知")
         server_code = SERVER_CODE_MAP.get(server, "cn")
 
@@ -2957,6 +2960,9 @@ class BestdoriPlugin(Star):
         按属性分组，每组按星级从高到低排序
         使用 base64 预加载所有图片以确保 headless Chrome 能正确渲染
         """
+        # 确保基础素材存在
+        await self.resource_manager.ensure_basic_assets()
+
         official_name = CHARACTER_MAP[char_id][0]
         band_id = CHARACTER_BAND_MAP.get(char_id, 1)
 
@@ -3394,6 +3400,9 @@ class BestdoriPlugin(Star):
             birthday_data: 生日数据字典
         """
         try:
+            # 确保基础素材存在
+            await self.resource_manager.ensure_basic_assets()
+
             char_id = birthday_data.get("character_id")
 
             # 检查缓存
@@ -3449,15 +3458,21 @@ class BestdoriPlugin(Star):
                 "card_image_url", ""
             )
 
-            # 如果是本地路径，转换为 file URI
-            if card_url and os.path.isabs(card_url):
-                from pathlib import Path
+            # 如果是本地路径，转换为 base64 data URI（headless Chrome 中 file:// 可能无法加载）
+            if card_url and os.path.isabs(card_url) and os.path.exists(card_url):
+                import base64
+                try:
+                    with open(card_url, "rb") as f:
+                        card_data = base64.b64encode(f.read()).decode("utf-8")
+                    card_url = f"data:image/png;base64,{card_data}"
+                except Exception as e:
+                    logger.warning(f"转换卡面图片为 base64 失败: {e}")
+                    # 回退到 file URI
+                    from pathlib import Path
+                    card_url = Path(card_url).as_uri()
 
-                card_url = Path(card_url).as_uri()
-
-            # 获取小人图标路径
+            # 获取小人图标路径并转换为 base64
             char_id = birthday_data.get("character_id")
-            # 假设 birthday_service.data_dir 是 Path 对象
             chibi_path = (
                 self.birthday_service.data_dir
                 / "assets"
@@ -3465,10 +3480,37 @@ class BestdoriPlugin(Star):
                 / f"chibi_{char_id}.png"
             )
             chibi_url = ""
+            
+            # 如果 chibi 图标不存在，尝试下载
+            if not chibi_path.exists():
+                logger.info(f"Chibi 图标不存在，尝试下载: char_{char_id}")
+                chibi_path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    import aiohttp
+                    download_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+                        async with session.get(download_url) as resp:
+                            if resp.status == 200:
+                                with open(chibi_path, "wb") as f:
+                                    f.write(await resp.read())
+                                logger.info(f"成功下载 chibi 图标: char_{char_id}")
+                except Exception as e:
+                    logger.warning(f"下载 chibi 图标失败: {e}")
+            
             if chibi_path.exists():
-                from pathlib import Path
-
-                chibi_url = chibi_path.as_uri()
+                import base64
+                try:
+                    with open(chibi_path, "rb") as f:
+                        chibi_data = base64.b64encode(f.read()).decode("utf-8")
+                    chibi_url = f"data:image/png;base64,{chibi_data}"
+                    logger.debug(f"已将 chibi 图标转换为 base64: char_{char_id}")
+                except Exception as e:
+                    logger.warning(f"转换 chibi 图标为 base64 失败: {e}")
+                    # 回退到远程 URL
+                    chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+            else:
+                logger.warning(f"Chibi 图标仍不存在，使用远程 URL: {chibi_path}")
+                chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
 
             # 从角色数据库或卡面图像中获取主题色
             char_id = birthday_data.get("character_id")

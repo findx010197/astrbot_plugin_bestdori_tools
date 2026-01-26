@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生日快乐 - {{ character_name }}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
-
+        /* 使用系统内置字体，确保 Docker 环境兼容性 */
+        /* 中文字体优先级：思源黑体 > 苹方 > 微软雅黑 > 黑体 > 无衬线字体 */
+        
         * {
             margin: 0;
             padding: 0;
@@ -28,7 +28,7 @@
             border-radius: 30px;
             overflow: hidden;
             box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-            font-family: 'Noto Sans SC', sans-serif;
+            font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "WenQuanYi Micro Hei", "SimHei", sans-serif;
             position: relative;
         }
         
@@ -69,8 +69,9 @@
             padding: 25px 35px;
             position: relative;
             color: {{ text_color }}; /* 随机主题色 */
-            font-family: 'Ma Shan Zheng', cursive, 'Noto Sans SC', sans-serif;
+            font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "WenQuanYi Micro Hei", "SimHei", sans-serif;
             font-size: 32px; /* 更大字号 */
+            font-weight: 500;
             line-height: 1.4;
             box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
             text-shadow: 1px 1px 0px rgba(0,0,0,0.05);
@@ -138,8 +139,9 @@
             position: absolute;
             bottom: 40px;
             right: 40px;
-            font-family: 'Ma Shan Zheng', cursive, sans-serif;
+            font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "SimHei", sans-serif;
             font-size: 70px;
+            font-weight: 700;
             color: #fff;
             text-shadow: 
                 3px 3px 0px {{ text_color }}, 

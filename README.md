@@ -76,18 +76,32 @@ BanG Dream! 少女乐团派对 游戏信息查询工具插件，基于 [Bestdori
 
 ### Docker 环境注意事项
 
-如果你使用 Docker 部署 AstrBot，需要确保容器中安装了 Chromium 浏览器：
+如果你使用 Docker 部署 AstrBot，需要确保容器中安装了 Chromium 浏览器和中文字体：
 
 ```dockerfile
 # 在 Dockerfile 中添加
-RUN apt-get update && apt-get install -y chromium chromium-driver
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    fonts-noto-cjk \
+    fonts-wqy-microhei \
+    && rm -rf /var/lib/apt/lists/*
 ```
 
 或者在运行容器后手动安装：
 ```bash
+# 安装 Chromium 浏览器
 docker exec -it <container_name> apt-get update
 docker exec -it <container_name> apt-get install -y chromium
+
+# 安装中文字体（解决渲染乱码问题）
+docker exec -it <container_name> apt-get install -y fonts-noto-cjk fonts-wqy-microhei
+
+# 刷新字体缓存
+docker exec -it <container_name> fc-cache -fv
 ```
+
+> ⚠️ **重要**: 如果不安装中文字体，生成的卡片图片中的中文会显示为方块乱码
 
 ## 🚀 使用方法
 
