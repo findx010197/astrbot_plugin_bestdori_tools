@@ -159,10 +159,15 @@ class BestdoriPlugin(Star):
                 print("✅ 所有依赖已满足")
 
             # 2. 检查系统依赖
-            dependency_manager.check_system_dependencies()
+            system_deps = dependency_manager.check_system_dependencies()
+            
+            # 3. 如果中文字体安装失败，尝试下载字体到本地
+            if system_deps and not system_deps.get("chinese_fonts", True):
+                print("💡 尝试下载字体到本地作为备选方案...")
+                await dependency_manager.download_font_to_local()
 
-            # 3. 执行首次运行检查和资源完整性检查
-            await self.resource_manager.first_run_check()
+            # 4. 执行首次运行检查和资源完整性检查（传入 client 以下载卡面和服装）
+            await self.resource_manager.first_run_check(client=self.client)
 
         except Exception as e:
             print(f"❌ 插件启动检查失败: {e}")
@@ -3468,7 +3473,7 @@ class BestdoriPlugin(Star):
                     with open(local_card_path, "rb") as f:
                         card_data_b64 = base64.b64encode(f.read()).decode("utf-8")
                     card_url = f"data:image/png;base64,{card_data_b64}"
-                    logger.debug(f"已将本地卡面转换为 base64: {local_card_path}")
+                    logger.info(f"✅ 已将本地卡面转换为 base64")
                 except Exception as e:
                     logger.warning(f"转换本地卡面为 base64 失败: {e}，使用远程 URL")
                     if card_url:
@@ -3476,19 +3481,43 @@ class BestdoriPlugin(Star):
             elif card_url:
                 urls_to_preload.append(card_url)
             
-            # Chibi 图标 URL（直接从远程加载，最可靠）
-            chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-            urls_to_preload.append(chibi_url)
+            # Chibi 图标 - 优先使用 ResourceManager 获取本地资源
+            chibi_url = self.resource_manager.get_local_chibi(char_id)
+            
+            if chibi_url:
+                logger.info(f"✅ 已使用本地 Chibi 图标: chibi_{char_id}.png")
+            else:
+                # 本地不存在，从远程下载并转为 base64
+                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                urls_to_preload.append(remote_chibi_url)
+            
+            logger.info(f"🔄 预加载图片: {urls_to_preload}")
             
             # 预加载所有远程图片
             image_cache = {}
             if urls_to_preload:
                 image_cache = await self._preload_images_as_base64(urls_to_preload)
             
-            # 获取预加载后的图片
+            # 获取预加载后的卡面图片
             if not card_url.startswith("data:"):
-                card_url = image_cache.get(card_url) or card_url
-            chibi_url = image_cache.get(chibi_url) or chibi_url
+                cached_card = image_cache.get(card_url)
+                if cached_card:
+                    card_url = cached_card
+                    logger.info(f"✅ 卡面图片预加载成功")
+                else:
+                    logger.warning(f"❌ 卡面图片预加载失败: {card_url}")
+            
+            # 如果 chibi 还没有设置（本地不存在），从预加载结果获取
+            if not chibi_url:
+                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                cached_chibi = image_cache.get(remote_chibi_url)
+                if cached_chibi:
+                    chibi_url = cached_chibi
+                    logger.info(f"✅ Chibi 图标远程预加载成功")
+                else:
+                    logger.warning(f"❌ Chibi 图标预加载失败，使用透明占位符")
+                    # 使用透明占位图（1x1透明PNG的base64）
+                    chibi_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
             # 从角色数据库或卡面图像中获取主题色
             text_color = color_extractor.extract_character_color(str(char_id), card_url)

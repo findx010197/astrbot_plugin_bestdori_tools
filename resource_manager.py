@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+import base64
 from pathlib import Path
 
 try:
@@ -11,6 +12,8 @@ logger = logging.getLogger("astrbot_plugin_bestdori_tools")
 
 # 基础素材 URL 基地址
 BESTDORI_ICON_BASE = "https://bestdori.com/res/icon"
+BESTDORI_IMAGE_BASE = "https://bestdori.com/res/image"
+BESTDORI_ASSETS_BASE = "https://bestdori.com/assets"
 
 # 资源定义
 BAND_ICON_URL_MAP = {
@@ -25,7 +28,8 @@ BAND_ICON_URL_MAP = {
     23: "band_45.svg",
 }
 ATTRIBUTES = ["powerful", "cool", "pure", "happy"]
-CHARACTERS = range(1, 46)
+# 所有角色 ID (1-45)
+ALL_CHARACTERS = list(range(1, 46))
 
 
 class ResourceManager:
@@ -35,7 +39,7 @@ class ResourceManager:
         self.birthday_service = birthday_service
 
         # 确保目录存在
-        for subdir in ["bands", "attributes", "stars", "chibi"]:
+        for subdir in ["bands", "attributes", "stars", "chibi", "frames", "costumes", "card_thumbs"]:
             (self.assets_dir / subdir).mkdir(parents=True, exist_ok=True)
 
     async def _download_file(self, url: str, path: Path, force: bool = False) -> bool:
@@ -90,7 +94,7 @@ class ResourceManager:
 
     async def download_basic_assets(self, check_existing: bool = False):
         """
-        下载基础素材（属性图标、星级图标等）
+        下载基础素材（属性图标、星级图标、乐队图标、所有角色 chibi、边框等）
 
         Args:
             check_existing: 是否检查已存在的文件，跳过下载
@@ -99,7 +103,7 @@ class ResourceManager:
             logger.info("📥 开始下载基础素材...")
 
             # 创建目录
-            for subdir in ["attributes", "stars", "chibi", "bands"]:
+            for subdir in ["attributes", "stars", "chibi", "bands", "frames"]:
                 (self.assets_dir / subdir).mkdir(parents=True, exist_ok=True)
 
             success_count = 0
@@ -148,15 +152,53 @@ class ResourceManager:
                 else:
                     fail_count += 1
 
-            # 下载常用角色小人
-            common_chars = [1, 21, 39, 16, 27]  # 几个主要角色
-            for char_id in common_chars:
+            # ========== 下载所有角色 chibi 图标 (45个角色) ==========
+            logger.info("📥 下载所有角色 Chibi 图标...")
+            for char_id in ALL_CHARACTERS:
                 file_path = self.assets_dir / "chibi" / f"chibi_{char_id}.png"
                 if check_existing and file_path.exists() and file_path.stat().st_size > 0:
                     success_count += 1
                     continue
 
                 url = f"{BESTDORI_ICON_BASE}/chara_icon_{char_id}.png"
+                if await self._download_file(url, file_path):
+                    success_count += 1
+                else:
+                    fail_count += 1
+
+            # ========== 下载卡面边框 (frame 和 card 系列) ==========
+            logger.info("📥 下载卡面边框...")
+            
+            # frame-X 系列 (用于大图)
+            frame_files = [
+                ("frame-2.png", f"{BESTDORI_IMAGE_BASE}/frame-2.png"),
+                ("frame-3.png", f"{BESTDORI_IMAGE_BASE}/frame-3.png"),
+                ("frame-4.png", f"{BESTDORI_IMAGE_BASE}/frame-4.png"),
+            ]
+            # 1星边框带属性
+            for attr in attributes:
+                frame_files.append(
+                    (f"frame-1-{attr}.png", f"{BESTDORI_IMAGE_BASE}/frame-1-{attr}.png")
+                )
+            
+            # card-X 系列 (用于缩略图)
+            card_frame_files = [
+                ("card-2.png", f"{BESTDORI_IMAGE_BASE}/card-2.png"),
+                ("card-3.png", f"{BESTDORI_IMAGE_BASE}/card-3.png"),
+                ("card-4.png", f"{BESTDORI_IMAGE_BASE}/card-4.png"),
+            ]
+            for attr in attributes:
+                card_frame_files.append(
+                    (f"card-1-{attr}.png", f"{BESTDORI_IMAGE_BASE}/card-1-{attr}.png")
+                )
+            
+            all_frame_files = frame_files + card_frame_files
+            for filename, url in all_frame_files:
+                file_path = self.assets_dir / "frames" / filename
+                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
+
                 if await self._download_file(url, file_path):
                     success_count += 1
                 else:
@@ -170,6 +212,256 @@ class ResourceManager:
             import traceback
             traceback.print_exc()
             return False
+
+    async def download_all_costumes(self, costumes_data: dict = None) -> bool:
+        """
+        下载所有 Live2D 服装小人
+
+        Args:
+            costumes_data: 服装数据字典 (从 client.get_costumes() 获取)
+
+        Returns:
+            是否全部成功
+        """
+        if not costumes_data:
+            logger.warning("⚠️ 没有服装数据，跳过服装下载")
+            return True
+
+        logger.info(f"📥 开始下载 Live2D 服装小人 (共 {len(costumes_data)} 个)...")
+        
+        costume_dir = self.assets_dir / "costumes"
+        costume_dir.mkdir(parents=True, exist_ok=True)
+
+        success_count = 0
+        fail_count = 0
+        skip_count = 0
+
+        for costume_id_str, costume_info in costumes_data.items():
+            try:
+                costume_id = int(costume_id_str)
+                abn = costume_info.get("assetBundleName")
+                if not abn:
+                    skip_count += 1
+                    continue
+
+                file_path = costume_dir / f"costume_{costume_id}.png"
+                if file_path.exists() and file_path.stat().st_size > 0:
+                    success_count += 1
+                    continue
+
+                # 计算服装分组
+                group = costume_id // 50
+                
+                # 尝试多个服务器
+                downloaded = False
+                for server in ["cn", "jp", "en", "tw", "kr"]:
+                    url = f"{BESTDORI_ASSETS_BASE}/{server}/thumb/costume/group{group}_rip/{abn}.png"
+                    if await self._download_file(url, file_path):
+                        success_count += 1
+                        downloaded = True
+                        break
+                
+                if not downloaded:
+                    fail_count += 1
+
+            except Exception as e:
+                logger.warning(f"下载服装 {costume_id_str} 失败: {e}")
+                fail_count += 1
+
+        logger.info(f"✅ 服装下载完成: 成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}")
+        return fail_count == 0
+
+    async def download_card_thumbs(self, cards_data: dict = None) -> bool:
+        """
+        下载所有卡面缩略图
+
+        Args:
+            cards_data: 卡面数据字典 (从 client.get_cards() 获取)
+
+        Returns:
+            是否全部成功
+        """
+        if not cards_data:
+            logger.warning("⚠️ 没有卡面数据，跳过卡面缩略图下载")
+            return True
+
+        logger.info(f"📥 开始下载卡面缩略图 (共 {len(cards_data)} 张)...")
+        
+        thumb_dir = self.assets_dir / "card_thumbs"
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+
+        success_count = 0
+        fail_count = 0
+        skip_count = 0
+
+        for card_id_str, card_info in cards_data.items():
+            try:
+                card_id = int(card_id_str)
+                res_name = card_info.get("resourceSetName")
+                if not res_name:
+                    skip_count += 1
+                    continue
+
+                # 计算资源分组
+                group_id = card_id // 50
+                folder_name = f"card{group_id:05d}_rip"
+
+                # 下载特训后缩略图
+                file_path = thumb_dir / f"card_{card_id}_trained.png"
+                if not (file_path.exists() and file_path.stat().st_size > 0):
+                    # 尝试多个服务器
+                    downloaded = False
+                    for server in ["cn", "jp", "en", "tw", "kr"]:
+                        url = f"{BESTDORI_ASSETS_BASE}/{server}/thumb/chara/{folder_name}/{res_name}_after_training.png"
+                        if await self._download_file(url, file_path):
+                            downloaded = True
+                            break
+                    
+                    if downloaded:
+                        success_count += 1
+                    else:
+                        # 1-2星卡没有特训后，尝试特训前
+                        rarity = card_info.get("rarity", 1)
+                        if rarity <= 2:
+                            for server in ["cn", "jp", "en", "tw", "kr"]:
+                                url = f"{BESTDORI_ASSETS_BASE}/{server}/thumb/chara/{folder_name}/{res_name}_normal.png"
+                                if await self._download_file(url, file_path):
+                                    downloaded = True
+                                    break
+                        
+                        if not downloaded:
+                            fail_count += 1
+                else:
+                    success_count += 1
+
+            except Exception as e:
+                logger.warning(f"下载卡面 {card_id_str} 缩略图失败: {e}")
+                fail_count += 1
+
+        logger.info(f"✅ 卡面缩略图下载完成: 成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}")
+        return fail_count == 0
+
+    def get_local_chibi(self, char_id: int) -> str:
+        """
+        获取本地 chibi 图标的 base64 data URI
+        
+        Args:
+            char_id: 角色 ID
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        file_path = self.assets_dir / "chibi" / f"chibi_{char_id}.png"
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地 chibi_{char_id}.png 失败: {e}")
+        return None
+
+    def get_local_frame(self, frame_name: str) -> str:
+        """
+        获取本地边框图片的 base64 data URI
+        
+        Args:
+            frame_name: 边框文件名 (如 "frame-4.png" 或 "card-3.png")
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        file_path = self.assets_dir / "frames" / frame_name
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地边框 {frame_name} 失败: {e}")
+        return None
+
+    def get_local_costume(self, costume_id: int) -> str:
+        """
+        获取本地服装小人的 base64 data URI
+        
+        Args:
+            costume_id: 服装 ID
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        file_path = self.assets_dir / "costumes" / f"costume_{costume_id}.png"
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地服装 costume_{costume_id}.png 失败: {e}")
+        return None
+
+    def get_local_card_thumb(self, card_id: int, trained: bool = True) -> str:
+        """
+        获取本地卡面缩略图的 base64 data URI
+        
+        Args:
+            card_id: 卡面 ID
+            trained: 是否为特训后
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        suffix = "trained" if trained else "normal"
+        file_path = self.assets_dir / "card_thumbs" / f"card_{card_id}_{suffix}.png"
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地卡面缩略图 card_{card_id}_{suffix}.png 失败: {e}")
+        return None
+
+    def get_local_attribute(self, attr: str) -> str:
+        """
+        获取本地属性图标的 base64 data URI
+        
+        Args:
+            attr: 属性名 (happy, cool, pure, powerful)
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        file_path = self.assets_dir / "attributes" / f"{attr.lower()}.svg"
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/svg+xml;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地属性图标 {attr}.svg 失败: {e}")
+        return None
+
+    def get_local_band(self, band_id: int) -> str:
+        """
+        获取本地乐队图标的 base64 data URI
+        
+        Args:
+            band_id: 乐队 ID
+            
+        Returns:
+            base64 data URI 或 None
+        """
+        file_path = self.assets_dir / "bands" / f"band_{band_id}.svg"
+        if file_path.exists() and file_path.stat().st_size > 0:
+            try:
+                with open(file_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/svg+xml;base64,{data}"
+            except Exception as e:
+                logger.warning(f"读取本地乐队图标 band_{band_id}.svg 失败: {e}")
+        return None
 
     async def check_resource_integrity(self) -> dict:
         """
@@ -229,8 +521,9 @@ class ResourceManager:
                 "powerful.svg": False,
             },
             "stars": {"star.png": False, "star_trained.png": False},
-            "chibi": {},  # 动态检查角色小人
+            "chibi": {},  # 动态检查所有角色小人
             "bands": {},  # 动态检查乐队图标
+            "frames": {},  # 动态检查边框
         }
 
         # 检查属性图标
@@ -243,10 +536,9 @@ class ResourceManager:
         for star_file in basic_assets["stars"]:
             basic_assets["stars"][star_file] = (star_dir / star_file).exists()
 
-        # 检查小人图标（检查常见角色）
+        # 检查所有角色小人图标 (45个角色)
         chibi_dir = self.assets_dir / "chibi"
-        common_chars = [1, 21, 39, 16, 27]  # Kasumi, Yukina, Soyo等常见角色
-        for char_id in common_chars:
+        for char_id in ALL_CHARACTERS:
             chibi_file = f"chibi_{char_id}.png"
             basic_assets["chibi"][chibi_file] = (chibi_dir / chibi_file).exists()
 
@@ -255,6 +547,14 @@ class ResourceManager:
         for band_id in BAND_ICON_URL_MAP:
             band_file = f"band_{band_id}.svg"
             basic_assets["bands"][band_file] = (band_dir / band_file).exists()
+
+        # 检查边框
+        frame_dir = self.assets_dir / "frames"
+        frame_files = ["frame-2.png", "frame-3.png", "frame-4.png", "card-2.png", "card-3.png", "card-4.png"]
+        for attr in ATTRIBUTES:
+            frame_files.extend([f"frame-1-{attr}.png", f"card-1-{attr}.png"])
+        for frame_file in frame_files:
+            basic_assets["frames"][frame_file] = (frame_dir / frame_file).exists()
 
         return basic_assets
 
@@ -345,10 +645,13 @@ class ResourceManager:
 
         return success
 
-    async def first_run_check(self):
+    async def first_run_check(self, client=None):
         """
         首次运行时的资源检查
         始终检查关键资源是否存在，缺失则下载
+        
+        Args:
+            client: BestdoriClient 实例，用于获取卡面和服装数据
         """
         try:
             logger.info("🔍 执行资源完整性检查...")
@@ -362,11 +665,42 @@ class ResourceManager:
             else:
                 logger.info("✅ 基础素材完整")
 
+            # 如果提供了 client，下载卡面缩略图和服装
+            if client:
+                try:
+                    # 检查是否需要下载卡面缩略图
+                    thumb_dir = self.assets_dir / "card_thumbs"
+                    existing_thumbs = len(list(thumb_dir.glob("*.png"))) if thumb_dir.exists() else 0
+                    
+                    # 检查是否需要下载服装
+                    costume_dir = self.assets_dir / "costumes"
+                    existing_costumes = len(list(costume_dir.glob("*.png"))) if costume_dir.exists() else 0
+                    
+                    # 只在首次或资源很少时下载
+                    if existing_thumbs < 100:
+                        logger.info("📥 开始下载卡面缩略图（首次运行可能需要几分钟）...")
+                        cards_data = await client.get_cards()
+                        if cards_data:
+                            await self.download_card_thumbs(cards_data)
+                    else:
+                        logger.info(f"✅ 已有 {existing_thumbs} 张卡面缩略图")
+                    
+                    if existing_costumes < 50:
+                        logger.info("📥 开始下载 Live2D 服装小人（首次运行可能需要几分钟）...")
+                        costumes_data = await client.get_costumes()
+                        if costumes_data:
+                            await self.download_all_costumes(costumes_data)
+                    else:
+                        logger.info(f"✅ 已有 {existing_costumes} 个服装小人")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ 下载扩展资源失败（不影响基本功能）: {e}")
+
             # 检查完整性报告（可选，用于详细诊断）
             integrity_report = await self.check_resource_integrity()
 
             if integrity_report["missing_basic"]:
-                logger.warning(f"⚠️ 仍有缺失的基础素材: {integrity_report['missing_basic']}")
+                logger.warning(f"⚠️ 仍有缺失的基础素材: {len(integrity_report['missing_basic'])} 个")
             if integrity_report["missing_birthday"]:
                 logger.info(f"📝 缺失生日资源的角色: {integrity_report['missing_birthday']}（将在查询时按需下载）")
 
@@ -396,6 +730,22 @@ class ResourceManager:
             star_path = self.assets_dir / "stars" / star_file
             if not star_path.exists() or star_path.stat().st_size == 0:
                 logger.debug(f"缺失星级图标: {star_path}")
+                return False
+
+        # 检查所有角色 chibi（必需）
+        chibi_dir = self.assets_dir / "chibi"
+        for char_id in ALL_CHARACTERS:
+            chibi_path = chibi_dir / f"chibi_{char_id}.png"
+            if not chibi_path.exists() or chibi_path.stat().st_size == 0:
+                logger.debug(f"缺失角色小人: chibi_{char_id}.png")
+                return False
+
+        # 检查乐队图标（必需）
+        band_dir = self.assets_dir / "bands"
+        for band_id in BAND_ICON_URL_MAP:
+            band_path = band_dir / f"band_{band_id}.svg"
+            if not band_path.exists() or band_path.stat().st_size == 0:
+                logger.debug(f"缺失乐队图标: band_{band_id}.svg")
                 return False
 
         return True

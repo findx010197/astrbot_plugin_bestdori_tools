@@ -140,10 +140,51 @@ class RenderService:
         template = self.env.get_template(template_name)
         return template.render(**kwargs)
 
+    def _get_local_font_base64(self) -> str:
+        """
+        获取本地字体的 base64 编码
+        
+        Returns:
+            字体的 base64 编码，如果本地不存在则返回 None
+        """
+        import base64
+        
+        # 检查本地字体文件
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        font_paths = [
+            os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.otf"),
+            os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.woff2"),
+        ]
+        
+        for font_path in font_paths:
+            if os.path.exists(font_path) and os.path.getsize(font_path) > 100000:
+                try:
+                    with open(font_path, "rb") as f:
+                        font_data = f.read()
+                    
+                    # 确定字体格式
+                    if font_path.endswith(".woff2"):
+                        font_format = "woff2"
+                        mime_type = "font/woff2"
+                    elif font_path.endswith(".otf"):
+                        font_format = "opentype"
+                        mime_type = "font/otf"
+                    else:
+                        font_format = "truetype"
+                        mime_type = "font/ttf"
+                    
+                    b64 = base64.b64encode(font_data).decode("utf-8")
+                    logger.info(f"✅ 已加载本地字体: {font_path} ({len(font_data)} bytes)")
+                    return f"data:{mime_type};base64,{b64}", font_format
+                except Exception as e:
+                    logger.warning(f"读取本地字体失败 {font_path}: {e}")
+        
+        return None, None
+
     def _inject_font_fallback(self, html_content: str) -> str:
         """
         为 HTML 注入中文字体回退支持
-        使用纯 CSS 字体栈确保在各种环境中都能正确渲染中文
+        优先使用本地嵌入的字体，回退到 Web 字体
         
         Args:
             html_content: 原始 HTML 内容
@@ -151,43 +192,126 @@ class RenderService:
         Returns:
             注入字体支持后的 HTML
         """
-        # 字体 CSS - 使用完整的中文字体回退栈
-        # 优先级：Noto Sans CJK (Linux) > 苹方 (Mac) > 微软雅黑 (Windows) > 文泉驿 (Linux) > 黑体 (通用)
-        font_css = '''
+        # 尝试获取本地字体
+        local_font_data, font_format = self._get_local_font_base64()
+        
+        if local_font_data:
+            # 使用本地嵌入的字体
+            font_css = f'''
+<style id="bestdori-font-embedded">
+/* 本地嵌入字体 - 确保任何环境都能正确渲染中文 */
+@font-face {{
+    font-family: 'Noto Sans SC Embedded';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('{local_font_data}') format('{font_format}');
+}}
+
+@font-face {{
+    font-family: 'Noto Sans SC Embedded';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('{local_font_data}') format('{font_format}');
+}}
+
+/* 中文字体回退栈 - 嵌入字体优先 */
+:root {{
+    --zh-font-stack: "Noto Sans SC Embedded", "Noto Sans CJK SC", "Noto Sans SC", 
+                     "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", 
+                     "Hiragino Sans GB", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+                     "SimHei", "Droid Sans Fallback", "Heiti SC", sans-serif;
+}}
+
+/* 全局字体强制覆盖 */
+* {{
+    font-family: var(--zh-font-stack) !important;
+}}
+
+html, body {{
+    font-family: var(--zh-font-stack) !important;
+}}
+</style>
+'''
+            logger.info("✅ 已注入嵌入式中文字体支持")
+        else:
+            # 回退到 Web 字体
+            font_css = '''
+<!-- 字体预加载 - 多 CDN 源 -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
 <style id="bestdori-font-fallback">
-/* 中文字体回退栈 - 覆盖所有操作系统 */
+/* Web 字体加载 - Google Fonts CDN */
+@font-face {
+    font-family: 'Noto Sans SC Web';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url('https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2') format('woff2'),
+         url('https://cdn.jsdelivr.net/npm/@aspect-build/aspect-fonts-noto-sans-sc@5.0.0/dist/NotoSansSC-Regular.woff2') format('woff2');
+    unicode-range: U+4E00-9FFF, U+3400-4DBF, U+3000-303F, U+FF00-FFEF, U+2E80-2EFF;
+}
+
+@font-face {
+    font-family: 'Noto Sans SC Web';
+    font-style: normal;
+    font-weight: 700;
+    font-display: block;
+    src: url('https://fonts.gstatic.com/s/notosanssc/v36/k3kXo84MPvpLmixcA63oeALhLOCT-xWNm8Hqd37g1OkDRZe7lR4sg1IzSy-MNbE9VH8V.0.woff2') format('woff2');
+    unicode-range: U+4E00-9FFF, U+3400-4DBF, U+3000-303F, U+FF00-FFEF, U+2E80-2EFF;
+}
+
+/* 中文字体回退栈 - Web 字体优先 */
 :root {
-    --zh-font-stack: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", 
-                     "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", 
-                     "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", 
-                     "Droid Sans Fallback", "SimHei", "STHeiti", 
-                     "Heiti SC", sans-serif;
+    --zh-font-stack: "Noto Sans SC Web", "Noto Sans CJK SC", "Noto Sans SC", 
+                     "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", 
+                     "Hiragino Sans GB", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+                     "SimHei", "Droid Sans Fallback", "Heiti SC", sans-serif;
 }
 
 /* 全局字体强制覆盖 */
-html, body, div, span, p, h1, h2, h3, h4, h5, h6, 
-a, label, input, button, textarea, select, 
-table, tr, td, th, li, ul, ol {
+* {
     font-family: var(--zh-font-stack) !important;
 }
 
-/* 确保 CJK 字符不会被替换为方块 */
-@supports (font-family: "Noto Sans CJK SC") {
-    * {
-        font-family: "Noto Sans CJK SC", var(--zh-font-stack) !important;
-    }
+html, body {
+    font-family: var(--zh-font-stack) !important;
 }
 </style>
+
+<!-- 字体加载检测脚本 -->
+<script>
+(function() {
+    // 等待字体加载完成
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function() {
+            document.body.setAttribute('data-fonts-loaded', 'true');
+            console.log('Fonts loaded');
+        });
+    }
+    // 强制触发字体加载
+    var testEl = document.createElement('div');
+    testEl.style.fontFamily = 'Noto Sans SC Web';
+    testEl.style.position = 'absolute';
+    testEl.style.left = '-9999px';
+    testEl.textContent = '测试字体加载中文';
+    document.body.appendChild(testEl);
+})();
+</script>
 '''
+            logger.info("✅ 已注入 Web 字体支持（本地字体不存在）")
+        
         # 在 <head> 标签后注入字体 CSS
         if '<head>' in html_content:
-            html_content = html_content.replace('<head>', '<head>' + font_css, 1)
+            html_content = html_content.replace('<head>', '<head>\n' + font_css, 1)
         elif '<HEAD>' in html_content:
-            html_content = html_content.replace('<HEAD>', '<HEAD>' + font_css, 1)
+            html_content = html_content.replace('<HEAD>', '<HEAD>\n' + font_css, 1)
         else:
             # 如果没有 head 标签，在开头添加
             html_content = font_css + html_content
-            
+        
         return html_content
 
     async def html_to_image(
@@ -256,15 +380,11 @@ table, tr, td, th, li, ul, ol {
         # 使用 url 参数而非 html_str，让浏览器有时间加载远程图片
         file_url = f"file:///{html_path.replace(os.sep, '/')}"
 
-        # 添加自定义flags来等待页面加载完成
-        original_flags = (
-            self.hti.custom_flags.copy() if hasattr(self.hti, "custom_flags") else []
-        )
-
-        # 等待一段时间让远程图片加载
+        # 等待一段时间让字体和图片加载
         import asyncio
-
-        await asyncio.sleep(2)  # 等待2秒让图片预加载
+        await asyncio.sleep(3)  # 等待3秒让字体和图片预加载
+        
+        logger.info(f"🖼️ 开始渲染: {output_file}")
 
         self.hti.screenshot(url=file_url, save_as=output_file, size=(width, 4000))
 

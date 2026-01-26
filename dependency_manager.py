@@ -302,6 +302,15 @@ class DependencyManager:
             print("✅ 中文字体已安装")
             return True
         
+        # 检查本地字体目录
+        plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        local_font = os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.otf")
+        if os.path.exists(local_font):
+            print("✅ 本地中文字体已存在")
+            # 配置到系统
+            self._configure_local_fonts(os.path.dirname(local_font))
+            return True
+        
         print("🔍 未检测到中文字体，尝试自动安装...")
         
         # 检测包管理器
@@ -407,6 +416,112 @@ class DependencyManager:
             )
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass  # fc-cache 不是必需的
+
+    async def download_font_to_local(self) -> bool:
+        """
+        下载中文字体到本地作为备选方案
+        当系统包管理器安装失败时使用
+        优先下载 woff2 格式（更小），回退到 OTF 格式
+        
+        Returns:
+            是否下载成功
+        """
+        try:
+            import aiohttp
+            
+            # 字体保存目录
+            plugin_dir = os.path.dirname(os.path.abspath(__file__))
+            fonts_dir = os.path.join(plugin_dir, "data", "fonts")
+            os.makedirs(fonts_dir, exist_ok=True)
+            
+            # 检查是否已存在任何字体文件
+            woff2_file = os.path.join(fonts_dir, "NotoSansSC-Regular.woff2")
+            otf_file = os.path.join(fonts_dir, "NotoSansSC-Regular.otf")
+            
+            if os.path.exists(woff2_file) and os.path.getsize(woff2_file) > 100000:
+                print(f"✅ 本地字体已存在: {woff2_file}")
+                return True
+            if os.path.exists(otf_file) and os.path.getsize(otf_file) > 1000000:
+                print(f"✅ 本地字体已存在: {otf_file}")
+                return True
+            
+            # 字体 URL 列表（优先 woff2，回退 OTF）
+            font_urls = [
+                # Google Fonts woff2 (小，约1-2MB)
+                ("NotoSansSC-Regular.woff2", "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2"),
+                # GitHub OTF (大，约16MB，作为备选)
+                ("NotoSansSC-Regular.otf", "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf"),
+            ]
+            
+            print(f"📥 正在下载中文字体...")
+            
+            async with aiohttp.ClientSession() as session:
+                for filename, font_url in font_urls:
+                    try:
+                        font_file = os.path.join(fonts_dir, filename)
+                        print(f"   尝试下载: {filename}...")
+                        
+                        async with session.get(font_url, timeout=aiohttp.ClientTimeout(total=120)) as resp:
+                            if resp.status == 200:
+                                content = await resp.read()
+                                
+                                # 验证内容大小（woff2 应该大于 100KB，OTF 大于 1MB）
+                                min_size = 100000 if filename.endswith(".woff2") else 1000000
+                                if len(content) < min_size:
+                                    print(f"   ⚠️ 文件太小，跳过")
+                                    continue
+                                
+                                with open(font_file, "wb") as f:
+                                    f.write(content)
+                                print(f"✅ 字体下载成功: {font_file} ({len(content)} bytes)")
+                                
+                                # 配置本地字体目录
+                                self._configure_local_fonts(fonts_dir)
+                                return True
+                            else:
+                                print(f"   ⚠️ HTTP {resp.status}，尝试下一个源...")
+                    except Exception as e:
+                        print(f"   ⚠️ 下载失败: {e}，尝试下一个源...")
+            
+            print(f"❌ 所有字体源下载失败")
+            return False
+                        
+        except Exception as e:
+            print(f"❌ 字体下载异常: {e}")
+            return False
+
+    def _configure_local_fonts(self, fonts_dir: str):
+        """
+        配置本地字体目录到 fontconfig
+        
+        Args:
+            fonts_dir: 字体目录路径
+        """
+        try:
+            # 创建用户字体配置
+            home = os.path.expanduser("~")
+            local_fonts_dir = os.path.join(home, ".fonts")
+            os.makedirs(local_fonts_dir, exist_ok=True)
+            
+            # 创建符号链接到我们的字体目录
+            for font_file in os.listdir(fonts_dir):
+                if font_file.endswith((".ttf", ".otf", ".woff2")):
+                    src = os.path.join(fonts_dir, font_file)
+                    dst = os.path.join(local_fonts_dir, font_file)
+                    if not os.path.exists(dst):
+                        try:
+                            os.symlink(src, dst)
+                        except OSError:
+                            # 符号链接失败，尝试复制
+                            import shutil
+                            shutil.copy2(src, dst)
+            
+            # 刷新字体缓存
+            self._refresh_font_cache()
+            print(f"✅ 已配置本地字体目录: {local_fonts_dir}")
+            
+        except Exception as e:
+            print(f"⚠️ 配置本地字体目录失败: {e}")
 
 
 # 创建全局依赖管理器实例
