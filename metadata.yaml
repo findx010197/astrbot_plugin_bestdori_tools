@@ -1,6 +1,7 @@
 name: bestdori_tools
 display_name: BanG Dream Bestdori 工具
 desc: BanG Dream! 少女乐团派对 游戏查询工具：活动信息、卡面查询、生日祝福、订阅播报等功能
-version: 1.2.0
+version: 1.2.1
 author: findx1197
-repo: https://github.com/findx1197/astrbot_plugin_bestdori_tools
+repo: https://github.com/findx010197/astrbot_plugin_bestdori_tools
+repo_root_name: astrbot_plugin_bestdori_tools
