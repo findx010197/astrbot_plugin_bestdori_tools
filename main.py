@@ -741,46 +741,58 @@ class BestdoriPlugin(Star):
             yield result
 
     @filter.command("admin")
-    async def shortcut_admin(self, event: AstrMessageEvent):
-        """快捷命令 /admin"""
-        # 从消息文本解析参数
-        full_text = event.message_str.strip()
-        parts = full_text.split()
-        args = parts[1:] if len(parts) > 1 else []
-        cmd_parts = ["admin"] + [a.lower() for a in args]
+    async def shortcut_admin(self, event: AstrMessageEvent, *args):
+        """快捷命令 /admin [子命令]"""
+        # 优先使用框架传递的参数，否则从消息文本解析
+        if args:
+            cmd_parts = ["admin"] + [str(a).lower() for a in args]
+        else:
+            full_text = event.message_str.strip()
+            parts = full_text.split()
+            args_list = parts[1:] if len(parts) > 1 else []
+            cmd_parts = ["admin"] + [a.lower() for a in args_list]
         async for result in self._dispatch_menu(event, cmd_parts):
             yield result
 
     @filter.command("games")
-    async def shortcut_games(self, event: AstrMessageEvent):
-        """快捷命令 /games"""
-        # 从消息文本解析参数
-        full_text = event.message_str.strip()
-        parts = full_text.split()
-        args = parts[1:] if len(parts) > 1 else []
-        cmd_parts = ["games"] + [a.lower() for a in args]
+    async def shortcut_games(self, event: AstrMessageEvent, *args):
+        """快捷命令 /games [子命令]"""
+        # 优先使用框架传递的参数，否则从消息文本解析
+        if args:
+            cmd_parts = ["games"] + [str(a).lower() for a in args]
+        else:
+            full_text = event.message_str.strip()
+            parts = full_text.split()
+            args_list = parts[1:] if len(parts) > 1 else []
+            cmd_parts = ["games"] + [a.lower() for a in args_list]
         async for result in self._dispatch_menu(event, cmd_parts):
             yield result
 
     @filter.command("event")
-    async def shortcut_event(self, event: AstrMessageEvent):
-        """快捷命令 /event"""
-        # 从消息文本解析参数
-        full_text = event.message_str.strip()
-        parts = full_text.split()
-        args = parts[1:] if len(parts) > 1 else []
-        sub_args = " ".join(args).strip()
+    async def shortcut_event(self, event: AstrMessageEvent, *args):
+        """快捷命令 /event [参数]"""
+        # 优先使用框架传递的参数，否则从消息文本解析
+        if args:
+            sub_args = " ".join(str(a) for a in args).strip()
+        else:
+            full_text = event.message_str.strip()
+            parts = full_text.split()
+            args_list = parts[1:] if len(parts) > 1 else []
+            sub_args = " ".join(args_list).strip()
         async for result in self._handle_event_menu(event, sub_args):
             yield result
 
     @filter.command("birthday")
-    async def shortcut_birthday(self, event: AstrMessageEvent):
-        """快捷命令 /birthday"""
-        # 从消息文本解析参数
-        full_text = event.message_str.strip()
-        parts = full_text.split()
-        args = parts[1:] if len(parts) > 1 else []
-        char_name = " ".join(args).strip()
+    async def shortcut_birthday(self, event: AstrMessageEvent, *args):
+        """快捷命令 /birthday [角色名]"""
+        # 优先使用框架传递的参数，否则从消息文本解析
+        if args:
+            char_name = " ".join(str(a) for a in args).strip()
+        else:
+            full_text = event.message_str.strip()
+            parts = full_text.split()
+            args_list = parts[1:] if len(parts) > 1 else []
+            char_name = " ".join(args_list).strip()
         async for result in self._handle_birthday_query(event, char_name):
             yield result
 
@@ -805,17 +817,24 @@ class BestdoriPlugin(Star):
     # ==================== 卡面ID查询命令 ====================
 
     @filter.command("id")
-    async def shortcut_card_id(self, event: AstrMessageEvent):
+    async def shortcut_card_id(self, event: AstrMessageEvent, *args):
         """卡面ID查询命令 /id xxxx"""
-        message = event.message_str.strip()
-        parts = message.split()
-
-        # 提取卡面ID
+        # 优先使用框架传递的参数
         card_id_str = ""
-        for part in parts:
-            if part.isdigit():
-                card_id_str = part
-                break
+        if args:
+            for arg in args:
+                if str(arg).isdigit():
+                    card_id_str = str(arg)
+                    break
+        
+        # 否则从消息文本解析
+        if not card_id_str:
+            message = event.message_str.strip()
+            parts = message.split()
+            for part in parts:
+                if part.isdigit():
+                    card_id_str = part
+                    break
 
         if not card_id_str:
             yield event.plain_result("请输入卡面ID，例如: /id 1234")
