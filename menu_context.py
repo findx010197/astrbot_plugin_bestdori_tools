@@ -86,10 +86,15 @@ class MenuContext:
             (3, "random", "随机抽取", "cmd:card_search_random"),
             (0, "back", "返回上级", "tools"),
         ],
+        "card_list_view": [
+            # 卡面列表查看模式 - 用户可以通过 /id xxxx 或 /xxxx 查询卡面详情
+            # 此菜单不显示选项，仅用于上下文识别
+            (0, "back", "返回上级", "tools"),
+        ],
         "card_detail": [
             (1, "illustration", "插画信息", "cmd:card_illustration"),
             (2, "detail", "详细信息", "cmd:card_detail"),
-            (0, "back", "返回上级", "tools"),
+            (0, "back", "返回上级", "card_list_view"),
         ],
     }
 

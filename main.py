@@ -974,6 +974,59 @@ class BestdoriPlugin(Star):
         async for result in self._handle_number_shortcut(event, 9):
             yield result
 
+    @filter.regex(r"^/(\d{2,5})$")
+    async def shortcut_card_id_regex(self, event: AstrMessageEvent):
+        """
+        正则匹配 /数字 格式（2-5位数字）用于卡面ID快捷查询
+        例如: /2327, /1234
+        需要在 card_list_view 上下文中才生效
+        """
+        # 从消息中提取数字
+        message = event.message_str.strip()
+        match = re.match(r"^/(\d{2,5})$", message)
+        if not match:
+            return
+
+        card_id_str = match.group(1)
+        card_id = int(card_id_str)
+
+        # 检查上下文
+        user_id = event.get_sender_id()
+        group_id = (
+            event.message_obj.group_id if hasattr(event.message_obj, "group_id") else ""
+        )
+        ctx = menu_context.get_context(user_id, group_id)
+
+        if not ctx:
+            # 没有上下文，提示用户
+            yield event.plain_result(
+                f"💡 请先使用 /bd card [角色名] 查看卡面列表\n"
+                f"   然后再使用 /{card_id_str} 查看详情"
+            )
+            return
+
+        current_menu = ctx.get("menu", "main")
+
+        # 如果在 card_list_view 上下文中，直接查询卡面
+        if current_menu == "card_list_view":
+            valid_card_ids = ctx.get("card_ids", [])
+            if card_id in valid_card_ids:
+                async for result in self._handle_card_id_query(event, card_id_str):
+                    yield result
+            else:
+                yield event.plain_result(
+                    f"❌ 卡面ID {card_id} 不在当前列表中\n💡 请从列表中选择有效的卡面ID"
+                )
+        elif current_menu == "card_detail":
+            # 在卡面详情菜单中，可能用户想查询另一张卡面
+            async for result in self._handle_card_id_query(event, card_id_str):
+                yield result
+        else:
+            # 其他上下文，提示用户
+            yield event.plain_result(
+                "💡 当前不在卡面查询模式\n   请先使用 /bd card [角色名] 查看卡面列表"
+            )
+
     async def _handle_number_shortcut(self, event: AstrMessageEvent, number: int):
         """处理数字快捷命令"""
         user_id = event.get_sender_id()
@@ -988,6 +1041,22 @@ class BestdoriPlugin(Star):
             # 没有上下文，提示用户先进入菜单
             yield event.plain_result("请先输入 /bd 进入菜单")
             return
+
+        current_menu = ctx.get("menu", "main")
+
+        # 特殊处理：如果在 card_list_view 上下文中，大数字视为卡面ID
+        if current_menu == "card_list_view" and number > 9:
+            # 检查是否是有效的卡面ID
+            valid_card_ids = ctx.get("card_ids", [])
+            if number in valid_card_ids:
+                async for result in self._handle_card_id_query(event, str(number)):
+                    yield result
+                return
+            else:
+                yield event.plain_result(
+                    f"❌ 卡面ID {number} 不在当前列表中\n💡 请从列表中选择有效的卡面ID"
+                )
+                return
 
         # 如果在输入模式中，数字输入可能是用户要输入的参数
         input_mode = ctx.get("input_mode")
@@ -1004,8 +1073,6 @@ class BestdoriPlugin(Star):
                     yield result
                 return
             # 其他输入模式可以在这里扩展
-
-        current_menu = ctx.get("menu", "main")
 
         # 获取对应的菜单项
         item = menu_context.get_item_by_number(current_menu, number)
@@ -3309,6 +3376,26 @@ class BestdoriPlugin(Star):
             # 保存到缓存
             await self.cache_manager.set_cache("card", image_path, **cache_key_params)
             yield event.image_result(image_path)
+
+            # 设置上下文：允许用户通过 /id xxxx 或 /xxxx 查询卡面详情
+            user_id = event.get_sender_id()
+            group_id = (
+                event.message_obj.group_id
+                if hasattr(event.message_obj, "group_id")
+                else ""
+            )
+            menu_context.set_context(
+                user_id,
+                group_id,
+                menu="card_list_view",
+                char_id=char_id,
+                card_ids=card_ids,  # 保存有效的卡面ID列表
+            )
+            # 提示用户可以继续查询
+            yield event.plain_result(
+                f"💡 输入 /id [卡面ID] 或 /[卡面ID] 查看详情\n"
+                f"   示例: /id {cards[0].card_id} 或 /{cards[0].card_id}"
+            )
         else:
             yield event.plain_result("渲染卡面列表失败")
 
