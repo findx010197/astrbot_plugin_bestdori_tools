@@ -676,23 +676,25 @@
             overflow: hidden;
             box-shadow: 0 6px 16px rgba(0,0,0,0.12); /* 增加一点阴影让卡面更立体 */
             border: 3px solid white; /* 白色边框增加照片感 */
+            background-color: #fff; /* 背景色，防止缩小的图片周围漏出容器背景 */
         }
         
         .reward-card-box .card-img {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 2.5%;      /* 上下留白，实现“裁剪”/缩小效果 */
+            left: 2.5%;     /* 左右留白 */
+            width: 95%;     /* 宽度缩小 */
+            height: 95%;    /* 高度缩小 */
             object-fit: cover;
+            border-radius: 8px; /* 图片本身加一点圆角 */
         }
         
         .reward-card-box .card-frame {
             position: absolute;
-            top: -2%;
-            left: -1.5%;
-            width: 103%;
-            height: 104%;
+            top: 0;
+            left: 0;
+            width: 100%;    /* 外框填满容器 */
+            height: 100%;
             pointer-events: none;
             z-index: 10;
         }
