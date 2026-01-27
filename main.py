@@ -3428,16 +3428,22 @@ class BestdoriPlugin(Star):
     async def _send_card_detail(self, event: AstrMessageEvent, card: Card):
         """发送单张卡片的详细信息和图片（带清晰度增强）"""
         from .image_utils import enhance_card_image
-        import astrbot.api.message_components as Comp
 
         official_name = CHARACTER_MAP[card.character_id][0]
+
+        # 先发送文字信息
+        msg = (
+            f"🎴 角色: {official_name}\n"
+            f"📋 ID: {card.card_id}\n"
+            f"📝 标题: {card.title}\n"
+            f"⭐ {card.rarity}★ | 🎨 {card.attribute.capitalize()}\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+        yield event.plain_result(msg)
 
         # 增强图片输出目录
         enhanced_dir = os.path.join(self.data_dir, "bestdori_tools", "enhanced")
         os.makedirs(enhanced_dir, exist_ok=True)
-
-        # 收集要发送的图片
-        images_to_send = []
 
         # 1. 特训前
         url_normal = card.get_card_icon_url("rip_normal")
@@ -3446,7 +3452,8 @@ class BestdoriPlugin(Star):
             if path:
                 # 应用清晰度增强
                 enhanced_path = enhance_card_image(path, enhanced_dir)
-                images_to_send.append(("特训前", enhanced_path))
+                yield event.plain_result("📷 特训前插画 (HD):")
+                yield event.image_result(enhanced_path)
 
         # 2. 特训后
         if card.rarity >= 3:
@@ -3456,25 +3463,8 @@ class BestdoriPlugin(Star):
                 if path:
                     # 应用清晰度增强
                     enhanced_path = enhance_card_image(path, enhanced_dir)
-                    images_to_send.append(("特训后", enhanced_path))
-
-        # 构建消息链：文字信息 + 所有图片
-        chain = [
-            Comp.Plain(
-                f"🎴 角色: {official_name}\n"
-                f"📋 ID: {card.card_id}\n"
-                f"📝 标题: {card.title}\n"
-                f"⭐ {card.rarity}★ | 🎨 {card.attribute.capitalize()}\n"
-                f"━━━━━━━━━━━━━━━━━━"
-            )
-        ]
-
-        for label, img_path in images_to_send:
-            chain.append(Comp.Plain(f"\n📷 {label}插画 (HD):"))
-            chain.append(Comp.Image.fromFileSystem(img_path))
-
-        # 发送消息链（图片原比例显示）
-        yield event.chain_result(chain)
+                    yield event.plain_result("📷 特训后插画 (HD):")
+                    yield event.image_result(enhanced_path)
 
     async def _send_card_illustration(self, event: AstrMessageEvent, card_id: int):
         """发送卡面的插画信息（特训前后两张rip大图）"""
