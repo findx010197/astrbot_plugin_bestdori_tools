@@ -99,6 +99,44 @@ class BestdoriPlugin(Star):
         self.scheduler = BroadcastScheduler(self.config, data_dir)
         self._register_scheduler_callbacks()
 
+        # 启动异步初始化任务 (替代 on_astrbot_loaded，确保一定会运行)
+        asyncio.create_task(self.async_init())
+
+    async def async_init(self):
+        """异步初始化任务"""
+        # 等待一小段时间确保框架就绪
+        await asyncio.sleep(2)
+        
+        logger.info("🚀 Bestdori 插件开始异步初始化")
+
+        # 1. 启动缓存清理调度器
+        if self._cache_cleanup_task is None:
+            self._cache_cleanup_task = asyncio.create_task(
+                self.cache_manager.start_cleanup_scheduler()
+            )
+
+        # 2. 执行启动检查 (资源下载等)
+        await self._startup_check()
+
+        # 3. 预热数据
+        try:
+            await self.client.get_events()
+            await self.client.get_cards()
+            logger.info("✅ Bestdori 数据预热完成")
+        except Exception as e:
+            logger.error(f"Bestdori 数据预热失败: {e}")
+
+        # 4. 启动定时播报调度器（确保只启动一次）
+        if not self._scheduler_started:
+            try:
+                # 确保使用最新配置
+                self.scheduler.update_config(self.config)
+                await self.scheduler.start()
+                self._scheduler_started = True
+                logger.info("✅ Bestdori 定时播报调度器已启动")
+            except Exception as e:
+                logger.error(f"定时播报调度器启动失败: {e}")
+
     def _get_config(self, key: str, default=None):
         """
         安全地获取配置值，兼容 AstrBotConfig 和 dict 两种类型
@@ -649,38 +687,10 @@ class BestdoriPlugin(Star):
         )
         return output_path if os.path.exists(output_path) else ""
 
-    @filter.on_astrbot_loaded()
-    async def on_astrbot_loaded(self):
-        """AstrBot 初始化完成时调用 - 在这里启动所有异步任务"""
-        logger.info("🚀 Bestdori 插件收到 AstrBot 初始化完成信号")
-
-        # 1. 启动缓存清理调度器
-        if self._cache_cleanup_task is None:
-            self._cache_cleanup_task = asyncio.create_task(
-                self.cache_manager.start_cleanup_scheduler()
-            )
-
-        # 2. 执行启动检查
-        await self._startup_check()
-
-        # 3. 预热数据
-        try:
-            await self.client.get_events()
-            await self.client.get_cards()
-            logger.info("✅ Bestdori 数据预热完成")
-        except Exception as e:
-            logger.error(f"Bestdori 数据预热失败: {e}")
-
-        # 4. 启动定时播报调度器（确保只启动一次）
-        if not self._scheduler_started:
-            try:
-                # 确保使用最新配置
-                self.scheduler.update_config(self.config)
-                await self.scheduler.start()
-                self._scheduler_started = True
-                logger.info("✅ Bestdori 定时播报调度器已启动")
-            except Exception as e:
-                logger.error(f"定时播报调度器启动失败: {e}")
+    # @filter.on_astrbot_loaded()
+    # async def on_astrbot_loaded(self):
+    #     """AstrBot 初始化完成时调用 - 已迁移至 async_init"""
+    #     pass
 
     async def terminate(self):
         """插件被卸载/停用时调用 - 清理资源"""
@@ -712,7 +722,7 @@ class BestdoriPlugin(Star):
         logger.info("✅ Bestdori 插件已完全停止")
 
     @filter.command("bd")
-    async def bestdori(self, event: AstrMessageEvent, *args):
+    async def bestdori(self, event: AstrMessageEvent):
         """Bestdori 插件统一入口 - 三级菜单系统"""
         # 记录用户活动（自动订阅播报）
         try:
@@ -742,20 +752,29 @@ class BestdoriPlugin(Star):
         except Exception as e:
             logger.debug(f"记录用户活动失败: {e}")
 
-        # 解析命令参数 - 优先使用框架传递的参数
-        if args:
-            cmd_parts = [str(a).lower() for a in args]
-        else:
-            # 回退到从消息文本解析
-            full_text = event.message_str.strip()
-            parts = full_text.split()
-            # 移除触发词前缀，获取参数列表
-            cmd_parts = []
-            if len(parts) > 0 and parts[0].lower() in ["/bd", "bd"]:
-                cmd_parts = [p.lower() for p in parts[1:]]
+        # 解析命令参数 - 仅从消息文本解析，避免框架参数注入问题
+        full_text = event.message_str.strip()
+        parts = full_text.split()
+        
+        # 移除触发词前缀 (/bd, /bestdori 等)，获取后续参数
+        cmd_parts = []
+        if len(parts) > 0:
+            # 检查第一个部分是否是触发词
+            first_part = parts[0].lower()
+            if any(first_part.endswith(trigger) for trigger in ["bd", "bestdori"]):
+                cmd_parts = parts[1:]
+            else:
+                # 某些情况下，parts 已经不包含触发词（取决于框架处理）
+                # 这里做一个简单的启发式判断
+                # 如果第一个词是子命令，则认为是参数
+                cmd_parts = parts
+        
+        # 统一转小写（针对命令关键字），保留原始大小写供后续处理（如搜索词）
+        # 这里只转换用于路由匹配的部分，实际处理时会重新取 parts
+        cmd_parts_lower = [p.lower() for p in cmd_parts]
 
         # 分发到三级菜单处理
-        async for result in self._dispatch_menu(event, cmd_parts):
+        async for result in self._dispatch_menu(event, cmd_parts_lower):
             yield result
 
     # ==================== 快捷命令入口 ====================
