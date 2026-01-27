@@ -42,7 +42,7 @@ from datetime import datetime
     "bestdori_tools",
     "findx1197",
     "BanG Dream Bestdori 工具插件",
-    "1.1.1",
+    "1.2.2",
     "https://github.com/findx1197/astrbot_plugin_bestdori_tools",
 )
 class BestdoriPlugin(Star):
@@ -376,8 +376,31 @@ class BestdoriPlugin(Star):
         text = f"🎂 **生日快乐** 🎂\n\n祝 {char_name} ({band_name}) 生日快乐！\n📅 {birthday}"
         messages.append({"type": "text", "content": text})
 
-        # TODO: 添加生日卡片图片和语音
-        # 这里可以复用 _render_birthday_card 的逻辑
+        # 添加生日卡片图片
+        try:
+            image_path = await self._generate_birthday_card_image(birthday_data)
+            if image_path:
+                messages.append({"type": "image", "content": image_path})
+        except Exception as e:
+            logger.error(f"生成生日播报图片失败: {e}")
+
+        # 如果有本地语音，也尝试添加 (播报支持语音吗？通常支持)
+        selected_card = birthday_data.get("selected_card")
+        if selected_card:
+            voice_path = selected_card.get("local_voice_path")
+            if voice_path and os.path.exists(voice_path):
+                # 尝试转换为wav (如果是mp3)
+                if voice_path.endswith(".mp3"):
+                    wav_path = voice_path.replace(".mp3", ".wav")
+                    if os.path.exists(wav_path):
+                        voice_path = wav_path
+                    else:
+                        from .audio_solutions import convert_to_wav
+                        if convert_to_wav(voice_path, wav_path):
+                            voice_path = wav_path
+                
+                if voice_path.endswith(".wav"):
+                    messages.append({"type": "voice", "content": voice_path})
 
         return messages
 
@@ -2108,6 +2131,124 @@ class BestdoriPlugin(Star):
             logger.error(f"自动服务器选择失败: {e}")
             yield event.plain_result(f"❌ 查询失败: {e}")
 
+    async def _generate_birthday_card_image(self, birthday_data: dict) -> str:
+        """
+        生成生日祝福卡片图片
+
+        Args:
+            birthday_data: 生日数据字典
+
+        Returns:
+            生成的图片路径，失败返回 None
+        """
+        try:
+            selected_card = birthday_data.get("selected_card")
+            if not selected_card:
+                return None
+
+            char_id = birthday_data.get("character_id")
+
+            # 收集需要预加载的图片 URL
+            urls_to_preload = []
+            
+            # 卡面图片 URL
+            card_url = selected_card.get("card_image_url", "")
+            local_card_path = selected_card.get("local_card_path")
+            
+            # 如果有本地卡面，转换为 base64
+            if local_card_path and os.path.isabs(local_card_path) and os.path.exists(local_card_path):
+                import base64
+                try:
+                    with open(local_card_path, "rb") as f:
+                        card_data_b64 = base64.b64encode(f.read()).decode("utf-8")
+                    card_url = f"data:image/png;base64,{card_data_b64}"
+                    logger.info(f"✅ 已将本地卡面转换为 base64")
+                except Exception as e:
+                    logger.warning(f"转换本地卡面为 base64 失败: {e}，使用远程 URL")
+                    if card_url:
+                        urls_to_preload.append(card_url)
+            elif card_url:
+                urls_to_preload.append(card_url)
+            
+            # Chibi 图标 - 优先使用 ResourceManager 获取本地资源
+            chibi_url = self.resource_manager.get_local_chibi(char_id)
+            
+            if chibi_url:
+                logger.info(f"✅ 已使用本地 Chibi 图标: chibi_{char_id}.png")
+            else:
+                # 本地不存在，从远程下载并转为 base64
+                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                urls_to_preload.append(remote_chibi_url)
+            
+            logger.info(f"🔄 预加载图片: {urls_to_preload}")
+            
+            # 预加载所有远程图片
+            image_cache = {}
+            if urls_to_preload:
+                image_cache = await self._preload_images_as_base64(urls_to_preload)
+            
+            # 获取预加载后的卡面图片
+            if not card_url.startswith("data:"):
+                cached_card = image_cache.get(card_url)
+                if cached_card:
+                    card_url = cached_card
+                    logger.info(f"✅ 卡面图片预加载成功")
+                else:
+                    logger.warning(f"❌ 卡面图片预加载失败: {card_url}")
+            
+            # 如果 chibi 还没有设置（本地不存在），从预加载结果获取
+            if not chibi_url:
+                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                cached_chibi = image_cache.get(remote_chibi_url)
+                if cached_chibi:
+                    chibi_url = cached_chibi
+                    logger.info(f"✅ Chibi 图标远程预加载成功")
+                    
+                    # 保存到本地供下次使用
+                    try:
+                        chibi_dir = os.path.join(os.path.dirname(__file__), "data", "assets", "chibi")
+                        os.makedirs(chibi_dir, exist_ok=True)
+                        # 从 base64 data URI 提取原始数据并保存
+                        if cached_chibi.startswith("data:"):
+                            b64_data = cached_chibi.split(",", 1)[1]
+                            with open(os.path.join(chibi_dir, f"chibi_{char_id}.png"), "wb") as f:
+                                f.write(base64.b64decode(b64_data))
+                            logger.info(f"✅ Chibi 图标已保存到本地")
+                    except Exception as e:
+                        logger.warning(f"保存 Chibi 图标失败: {e}")
+                else:
+                    logger.warning(f"❌ Chibi 图标预加载失败，使用透明占位符")
+                    # 使用透明占位图（1x1透明PNG的base64）
+                    chibi_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+            # 从角色数据库或卡面图像中获取主题色
+            text_color = color_extractor.extract_character_color(str(char_id), card_url)
+
+            render_data = {
+                "character_name": birthday_data["character_name"],
+                "band_name": birthday_data["band_name"],
+                "birthday": birthday_data["birthday"],
+                "card_prefix": selected_card.get("prefix", "生日纪念"),
+                "card_image_url": card_url,
+                "birthday_text": selected_card.get("birthday_text", ""),
+                "chibi_url": chibi_url,
+                "text_color": text_color,
+            }
+
+            # 渲染HTML模板
+            html = self.renderer.render_template("birthday_card.html", **render_data)
+
+            # 转换为图片
+            image_path = await self.renderer.html_to_image(html, "birthday")
+            
+            if image_path and os.path.exists(image_path):
+                return image_path
+            return None
+            
+        except Exception as e:
+            logger.error(f"生成生日卡片失败: {e}")
+            return None
+
     async def _render_event(
         self, event: AstrMessageEvent, target_id: int = None, server: int = SERVER_CN
     ):
@@ -3278,8 +3419,7 @@ class BestdoriPlugin(Star):
             card = Card(card_id, cards_data[str(card_id)])
             official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
 
-            # TODO: 实现详细信息卡片的HTML渲染
-            # 目前先使用文字版本
+            # 目前仅支持文字版本详情，HTML图片渲染待未来版本支持
             msg = (
                 f"[ 卡面详细信息 ]\n"
                 f"------------------------\n"
@@ -3290,8 +3430,7 @@ class BestdoriPlugin(Star):
                 f"属性: {card.attribute.capitalize()}\n"
                 f"资源名: {card.resource_set_name}\n"
                 f"发布时间: {card.released_at.get('0', '未知')}\n"
-                f"------------------------\n"
-                f"📌 详细信息卡片功能开发中..."
+                f"------------------------"
             )
             yield event.plain_result(msg)
 
@@ -3417,169 +3556,68 @@ class BestdoriPlugin(Star):
             if cached_image:
                 logger.info(f"命中生日卡片缓存: birthday_char_{char_id}")
                 yield event.image_result(cached_image)
-
-                # 继续发送语音等其他内容
-                selected_card = birthday_data.get("selected_card")
-                if selected_card:
-                    card_id = selected_card.get("card_id")
-                    if card_id:
-                        try:
-                            card_data = await self.client.get_card_detail(card_id)
-                            if card_data:
-                                costume_id = card_data.get("costumeId")
-                                costume_url = None
-
-                                if costume_id:
-                                    costumes_data = await self.client.get_costumes()
-                                    if str(costume_id) in costumes_data:
-                                        abn = costumes_data[str(costume_id)].get(
-                                            "assetBundleName"
-                                        )
-                                        costume_url = self.client.get_costume_icon_url(
-                                            costume_id, abn
-                                        )
-
-                                if costume_url:
-                                    yield event.image_result(costume_url)
-                        except Exception as e:
-                            logger.warning(f"获取生日Live2D小人失败: {e}")
-
-                    voice_path = selected_card.get("local_voice_path")
-                    if voice_path and os.path.exists(voice_path):
-                        try:
-                            yield event.voice_result(voice_path)
-                        except Exception as e:
-                            logger.warning(f"发送语音失败: {e}")
-                return
-
-            selected_card = birthday_data.get("selected_card")
-            if not selected_card:
-                yield event.plain_result("⚠️ 没有可用的生日卡片")
-                return
-
-            char_id = birthday_data.get("character_id")
-
-            # 收集需要预加载的图片 URL
-            urls_to_preload = []
-            
-            # 卡面图片 URL
-            card_url = selected_card.get("card_image_url", "")
-            local_card_path = selected_card.get("local_card_path")
-            
-            # 如果有本地卡面，转换为 base64
-            if local_card_path and os.path.isabs(local_card_path) and os.path.exists(local_card_path):
-                import base64
-                try:
-                    with open(local_card_path, "rb") as f:
-                        card_data_b64 = base64.b64encode(f.read()).decode("utf-8")
-                    card_url = f"data:image/png;base64,{card_data_b64}"
-                    logger.info(f"✅ 已将本地卡面转换为 base64")
-                except Exception as e:
-                    logger.warning(f"转换本地卡面为 base64 失败: {e}，使用远程 URL")
-                    if card_url:
-                        urls_to_preload.append(card_url)
-            elif card_url:
-                urls_to_preload.append(card_url)
-            
-            # Chibi 图标 - 优先使用 ResourceManager 获取本地资源
-            chibi_url = self.resource_manager.get_local_chibi(char_id)
-            
-            if chibi_url:
-                logger.info(f"✅ 已使用本地 Chibi 图标: chibi_{char_id}.png")
             else:
-                # 本地不存在，从远程下载并转为 base64
-                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-                urls_to_preload.append(remote_chibi_url)
-            
-            logger.info(f"🔄 预加载图片: {urls_to_preload}")
-            
-            # 预加载所有远程图片
-            image_cache = {}
-            if urls_to_preload:
-                image_cache = await self._preload_images_as_base64(urls_to_preload)
-            
-            # 获取预加载后的卡面图片
-            if not card_url.startswith("data:"):
-                cached_card = image_cache.get(card_url)
-                if cached_card:
-                    card_url = cached_card
-                    logger.info(f"✅ 卡面图片预加载成功")
+                # 生成新图片
+                image_path = await self._generate_birthday_card_image(birthday_data)
+                if image_path:
+                    # 保存到缓存
+                    await self.cache_manager.set_cache(
+                        "birthday", image_path, char_id=char_id
+                    )
+                    yield event.image_result(image_path)
                 else:
-                    logger.warning(f"❌ 卡面图片预加载失败: {card_url}")
-            
-            # 如果 chibi 还没有设置（本地不存在），从预加载结果获取
-            if not chibi_url:
-                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
-                cached_chibi = image_cache.get(remote_chibi_url)
-                if cached_chibi:
-                    chibi_url = cached_chibi
-                    logger.info(f"✅ Chibi 图标远程预加载成功")
-                else:
-                    logger.warning(f"❌ Chibi 图标预加载失败，使用透明占位符")
-                    # 使用透明占位图（1x1透明PNG的base64）
-                    chibi_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-
-            # 从角色数据库或卡面图像中获取主题色
-            text_color = color_extractor.extract_character_color(str(char_id), card_url)
-
-            render_data = {
-                "character_name": birthday_data["character_name"],
-                "band_name": birthday_data["band_name"],
-                "birthday": birthday_data["birthday"],
-                "card_prefix": selected_card.get("prefix", "生日纪念"),
-                "card_image_url": card_url,
-                "birthday_text": selected_card.get("birthday_text", ""),
-                "chibi_url": chibi_url,
-                "text_color": text_color,
-            }
-
-            # 渲染HTML模板
-            html = self.renderer.render_template("birthday_card.html", **render_data)
-
-            # 转换为图片
-            image_path = await self.renderer.html_to_image(html, "birthday")
-
-            if image_path and os.path.exists(image_path):
-                # 保存到缓存
-                await self.cache_manager.set_cache(
-                    "birthday", image_path, char_id=char_id
-                )
-                yield event.image_result(image_path)
-            else:
-                yield event.plain_result("⚠️ 生日卡片生成失败")
+                    yield event.plain_result("⚠️ 生日卡片生成失败")
 
             # 发送 Live2D 小人 (三段式消息优化)
-            card_id = selected_card.get("card_id")
-            if card_id:
-                try:
-                    # 获取卡片详情以查找 Costume
-                    card_data = await self.client.get_card_detail(card_id)
-                    if card_data:
-                        costume_id = card_data.get("costumeId")
-                        costume_url = None
+            selected_card = birthday_data.get("selected_card")
+            if selected_card:
+                card_id = selected_card.get("card_id")
+                if card_id:
+                    try:
+                        # 获取卡片详情以查找 Costume
+                        card_data = await self.client.get_card_detail(card_id)
+                        if card_data:
+                            costume_id = card_data.get("costumeId")
+                            costume_url = None
 
-                        if costume_id:
-                            costumes_data = await self.client.get_costumes()
-                            if str(costume_id) in costumes_data:
-                                abn = costumes_data[str(costume_id)].get(
-                                    "assetBundleName"
-                                )
-                                costume_url = self.client.get_costume_icon_url(
-                                    costume_id, abn
-                                )
+                            if costume_id:
+                                costumes_data = await self.client.get_costumes()
+                                if str(costume_id) in costumes_data:
+                                    abn = costumes_data[str(costume_id)].get(
+                                        "assetBundleName"
+                                    )
+                                    costume_url = self.client.get_costume_icon_url(
+                                        costume_id, abn
+                                    )
 
-                        if costume_url:
-                            yield event.image_result(costume_url)
-                except Exception as e:
-                    logger.warning(f"获取生日Live2D小人失败: {e}")
+                            if costume_url:
+                                yield event.image_result(costume_url)
+                    except Exception as e:
+                        logger.warning(f"获取生日Live2D小人失败: {e}")
 
-            # 发送语音文件
-            voice_path = selected_card.get("local_voice_path")
-            if voice_path and os.path.exists(voice_path):
-                try:
-                    logger.info(f"准备发送语音文件: {voice_path}")
+                # 发送语音文件
+                voice_path = selected_card.get("local_voice_path")
+                if voice_path and os.path.exists(voice_path):
+                    try:
+                        logger.info(f"准备发送语音文件: {voice_path}")
 
-                    # 将MP3转换为WAV格式（AstrBot只支持WAV）
+                        # 将MP3转换为WAV格式（AstrBot只支持WAV）
+                        # 检查是否有 .wav 版本
+                        wav_path = voice_path.replace(".mp3", ".wav")
+                        if not os.path.exists(wav_path):
+                            from .audio_solutions import convert_to_wav
+                            if convert_to_wav(voice_path, wav_path):
+                                voice_path = wav_path
+                            else:
+                                logger.warning("语音转码失败，尝试发送原文件")
+
+                        yield event.voice_result(voice_path)
+                    except Exception as e:
+                        logger.warning(f"发送语音失败: {e}")
+
+        except Exception as e:
+            logger.error(f"渲染生日卡片失败: {e}")
+            yield event.plain_result(f"渲染失败: {e}")
                     wav_path = voice_path.replace(".mp3", ".wav")
 
                     # 检查是否已经转换过
