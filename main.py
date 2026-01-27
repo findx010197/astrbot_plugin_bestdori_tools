@@ -1,7 +1,6 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
-import astrbot.api.message_components as Comp
 from .client import BestdoriClient
 from .models import (
     Event,
@@ -106,7 +105,7 @@ class BestdoriPlugin(Star):
         """异步初始化任务"""
         # 等待一小段时间确保框架就绪
         await asyncio.sleep(2)
-        
+
         logger.info("🚀 Bestdori 插件开始异步初始化")
 
         # 1. 启动缓存清理调度器
@@ -198,7 +197,7 @@ class BestdoriPlugin(Star):
 
             # 2. 检查系统依赖
             system_deps = dependency_manager.check_system_dependencies()
-            
+
             # 3. 如果中文字体安装失败，尝试下载字体到本地
             if system_deps and not system_deps.get("chinese_fonts", True):
                 print("💡 尝试下载字体到本地作为备选方案...")
@@ -434,9 +433,10 @@ class BestdoriPlugin(Star):
                         voice_path = wav_path
                     else:
                         from .audio_solutions import convert_to_wav
+
                         if convert_to_wav(voice_path, wav_path):
                             voice_path = wav_path
-                
+
                 if voice_path.endswith(".wav"):
                     messages.append({"type": "voice", "content": voice_path})
 
@@ -539,7 +539,6 @@ class BestdoriPlugin(Star):
         try:
             # 使用 AstrBot 官方 API 导入
             from astrbot.api.event import MessageChain
-            import astrbot.api.message_components as Comp
 
             # 解析目标类型
             if target.startswith("group_"):
@@ -755,7 +754,7 @@ class BestdoriPlugin(Star):
         # 解析命令参数 - 仅从消息文本解析，避免框架参数注入问题
         full_text = event.message_str.strip()
         parts = full_text.split()
-        
+
         # 移除触发词前缀 (/bd, /bestdori 等)，获取后续参数
         cmd_parts = []
         if len(parts) > 0:
@@ -768,7 +767,7 @@ class BestdoriPlugin(Star):
                 # 这里做一个简单的启发式判断
                 # 如果第一个词是子命令，则认为是参数
                 cmd_parts = parts
-        
+
         # 统一转小写（针对命令关键字），保留原始大小写供后续处理（如搜索词）
         # 这里只转换用于路由匹配的部分，实际处理时会重新取 parts
         cmd_parts_lower = [p.lower() for p in cmd_parts]
@@ -876,7 +875,7 @@ class BestdoriPlugin(Star):
                 if str(arg).isdigit():
                     card_id_str = str(arg)
                     break
-        
+
         # 否则从消息文本解析
         if not card_id_str:
             message = event.message_str.strip()
@@ -2169,74 +2168,87 @@ class BestdoriPlugin(Star):
 
             # 收集需要预加载的图片 URL
             urls_to_preload = []
-            
+
             # 卡面图片 URL
             card_url = selected_card.get("card_image_url", "")
             local_card_path = selected_card.get("local_card_path")
-            
+
             # 如果有本地卡面，转换为 base64
-            if local_card_path and os.path.isabs(local_card_path) and os.path.exists(local_card_path):
+            if (
+                local_card_path
+                and os.path.isabs(local_card_path)
+                and os.path.exists(local_card_path)
+            ):
                 import base64
+
                 try:
                     with open(local_card_path, "rb") as f:
                         card_data_b64 = base64.b64encode(f.read()).decode("utf-8")
                     card_url = f"data:image/png;base64,{card_data_b64}"
-                    logger.info(f"✅ 已将本地卡面转换为 base64")
+                    logger.info("✅ 已将本地卡面转换为 base64")
                 except Exception as e:
                     logger.warning(f"转换本地卡面为 base64 失败: {e}，使用远程 URL")
                     if card_url:
                         urls_to_preload.append(card_url)
             elif card_url:
                 urls_to_preload.append(card_url)
-            
+
             # Chibi 图标 - 优先使用 ResourceManager 获取本地资源
             chibi_url = self.resource_manager.get_local_chibi(char_id)
-            
+
             if chibi_url:
                 logger.info(f"✅ 已使用本地 Chibi 图标: chibi_{char_id}.png")
             else:
                 # 本地不存在，从远程下载并转为 base64
-                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                remote_chibi_url = (
+                    f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                )
                 urls_to_preload.append(remote_chibi_url)
-            
+
             logger.info(f"🔄 预加载图片: {urls_to_preload}")
-            
+
             # 预加载所有远程图片
             image_cache = {}
             if urls_to_preload:
                 image_cache = await self._preload_images_as_base64(urls_to_preload)
-            
+
             # 获取预加载后的卡面图片
             if not card_url.startswith("data:"):
                 cached_card = image_cache.get(card_url)
                 if cached_card:
                     card_url = cached_card
-                    logger.info(f"✅ 卡面图片预加载成功")
+                    logger.info("✅ 卡面图片预加载成功")
                 else:
                     logger.warning(f"❌ 卡面图片预加载失败: {card_url}")
-            
+
             # 如果 chibi 还没有设置（本地不存在），从预加载结果获取
             if not chibi_url:
-                remote_chibi_url = f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                remote_chibi_url = (
+                    f"https://bestdori.com/res/icon/chara_icon_{char_id}.png"
+                )
                 cached_chibi = image_cache.get(remote_chibi_url)
                 if cached_chibi:
                     chibi_url = cached_chibi
-                    logger.info(f"✅ Chibi 图标远程预加载成功")
-                    
+                    logger.info("✅ Chibi 图标远程预加载成功")
+
                     # 保存到本地供下次使用
                     try:
-                        chibi_dir = os.path.join(os.path.dirname(__file__), "data", "assets", "chibi")
+                        chibi_dir = os.path.join(
+                            os.path.dirname(__file__), "data", "assets", "chibi"
+                        )
                         os.makedirs(chibi_dir, exist_ok=True)
                         # 从 base64 data URI 提取原始数据并保存
                         if cached_chibi.startswith("data:"):
                             b64_data = cached_chibi.split(",", 1)[1]
-                            with open(os.path.join(chibi_dir, f"chibi_{char_id}.png"), "wb") as f:
+                            with open(
+                                os.path.join(chibi_dir, f"chibi_{char_id}.png"), "wb"
+                            ) as f:
                                 f.write(base64.b64decode(b64_data))
-                            logger.info(f"✅ Chibi 图标已保存到本地")
+                            logger.info("✅ Chibi 图标已保存到本地")
                     except Exception as e:
                         logger.warning(f"保存 Chibi 图标失败: {e}")
                 else:
-                    logger.warning(f"❌ Chibi 图标预加载失败，使用透明占位符")
+                    logger.warning("❌ Chibi 图标预加载失败，使用透明占位符")
                     # 使用透明占位图（1x1透明PNG的base64）
                     chibi_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
@@ -2259,11 +2271,11 @@ class BestdoriPlugin(Star):
 
             # 转换为图片
             image_path = await self.renderer.html_to_image(html, "birthday")
-            
+
             if image_path and os.path.exists(image_path):
                 return image_path
             return None
-            
+
         except Exception as e:
             logger.error(f"生成生日卡片失败: {e}")
             return None
@@ -2469,7 +2481,7 @@ class BestdoriPlugin(Star):
                                     bgm_file = song_detail.get("bgmFile", "")
                                     if bgm_file:
                                         jacket_url = f"https://bestdori.com/assets/{server_code}/musicjacket/musicjacket{jacket_group}_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket{jacket_group}-{bgm_file}-jacket.png"
-                            except:
+                            except Exception:
                                 pass
 
                             if not jacket_url:
@@ -2526,7 +2538,7 @@ class BestdoriPlugin(Star):
                                                 render_data["stamp_reward"] = {
                                                     "image": stamp_url
                                                 }
-                                        except:
+                                        except Exception:
                                             pass
             except Exception as e:
                 logger.warning(f"获取活动详情失败: {e}")
@@ -2553,7 +2565,7 @@ class BestdoriPlugin(Star):
                         if card.resource_set_name and len(card.resource_set_name) >= 6:
                             try:
                                 resource_id = int(card.resource_set_name[3:6])
-                            except:
+                            except Exception:
                                 pass
 
                         char_name = CHARACTER_MAP.get(resource_id, ["未知"])[0]
@@ -2716,11 +2728,6 @@ class BestdoriPlugin(Star):
                 for gid, gdata in gachas_data.items():
                     gacha = Gacha(int(gid), gdata)
                     gacha_start = gacha.get_start_time(server=server)
-                    gacha_end = (
-                        gacha.get_end_time(server=server)
-                        if hasattr(gacha, "get_end_time")
-                        else None
-                    )
 
                     # 使用活动时间范围筛选（招募开始时间在活动时间范围内）
                     if gacha_start and event_start and event_end:
@@ -2762,7 +2769,7 @@ class BestdoriPlugin(Star):
                                     )
                                     if end_match:
                                         gacha_end_str = f"{int(end_match.group(1))}/{int(end_match.group(2))}"
-                            except:
+                            except Exception:
                                 pass
 
                             # 获取招募封面，验证有效性，无效则使用备用封面
@@ -3049,7 +3056,7 @@ class BestdoriPlugin(Star):
                     star_num = int(p1.replace("星", ""))
                     if 1 <= star_num <= 5:
                         filter_star = star_num
-                except:
+                except Exception:
                     pass
             elif p1 in ["happy", "cool", "pure", "powerful", "power"]:
                 filter_attr = p1 if p1 != "power" else "powerful"
@@ -3064,7 +3071,7 @@ class BestdoriPlugin(Star):
                         star_num = int(extra_p.replace("星", ""))
                         if 1 <= star_num <= 5:
                             filter_star = star_num
-                    except:
+                    except Exception:
                         pass
                 elif extra_p in ["happy", "cool", "pure", "powerful", "power"]:
                     filter_attr = extra_p if extra_p != "power" else "powerful"
@@ -3129,7 +3136,6 @@ class BestdoriPlugin(Star):
         await self.resource_manager.ensure_basic_assets()
 
         official_name = CHARACTER_MAP[char_id][0]
-        band_id = CHARACTER_BAND_MAP.get(char_id, 1)
 
         # 生成缓存键（基于角色ID和卡片ID列表）
         card_ids = sorted([c.card_id for c in cards])
@@ -3625,6 +3631,7 @@ class BestdoriPlugin(Star):
                         wav_path = voice_path.replace(".mp3", ".wav")
                         if not os.path.exists(wav_path):
                             from .audio_solutions import convert_to_wav
+
                             if convert_to_wav(voice_path, wav_path):
                                 voice_path = wav_path
                             else:
@@ -3637,102 +3644,6 @@ class BestdoriPlugin(Star):
         except Exception as e:
             logger.error(f"渲染生日卡片失败: {e}")
             yield event.plain_result(f"渲染失败: {e}")
-                    wav_path = voice_path.replace(".mp3", ".wav")
-
-                    # 检查是否已经转换过
-                    if not os.path.exists(wav_path):
-                        conversion_success = False
-
-                        # 尝试1: 使用pydub
-                        try:
-                            from pydub import AudioSegment
-
-                            logger.info("使用pydub转换MP3到WAV...")
-                            audio = AudioSegment.from_mp3(voice_path)
-                            audio.export(wav_path, format="wav")
-                            conversion_success = True
-                            logger.info(f"pydub转换成功: {wav_path}")
-                        except ImportError:
-                            logger.warning("未安装pydub库")
-                        except Exception as e:
-                            logger.error(f"pydub转换失败: {e}")
-
-                        # 尝试2: 使用ffmpeg
-                        if not conversion_success:
-                            try:
-                                import subprocess
-
-                                logger.info("尝试使用ffmpeg转换...")
-                                result = subprocess.run(
-                                    [
-                                        "ffmpeg",
-                                        "-i",
-                                        voice_path,
-                                        "-ar",
-                                        "44100",
-                                        "-ac",
-                                        "2",
-                                        "-y",
-                                        wav_path,
-                                    ],
-                                    check=True,
-                                    capture_output=True,
-                                    text=True,
-                                )
-                                conversion_success = True
-                                logger.info(f"ffmpeg转换成功: {wav_path}")
-                            except FileNotFoundError:
-                                logger.error("系统未安装ffmpeg")
-                            except Exception as e:
-                                logger.error(f"ffmpeg转换失败: {e}")
-
-                        # 如果都失败了，提示用户
-                        if not conversion_success:
-                            size_kb = os.path.getsize(voice_path) / 1024
-                            yield event.plain_result(
-                                f"🔊 生日语音已下载，但需要转换格式\n"
-                                f"📁 MP3文件: {voice_path}\n"
-                                f"📊 文件大小: {size_kb:.2f} KB\n\n"
-                                f"💡 安装方法（任选其一）：\n"
-                                f"• pip install pydub\n"
-                                f"• 安装ffmpeg到系统PATH"
-                            )
-                            return
-                    else:
-                        logger.info(f"WAV文件已存在: {wav_path}")
-
-                    # 确认WAV文件存在后再发送
-                    if os.path.exists(wav_path):
-                        voice_chain = [Comp.Record(file=wav_path, url=wav_path)]
-                        yield event.chain_result(voice_chain)
-                        logger.info("语音消息发送成功")
-                    else:
-                        logger.error(f"WAV文件不存在: {wav_path}")
-                        yield event.plain_result(
-                            "⚠️ 语音文件转换失败，请检查pydub或ffmpeg安装"
-                        )
-
-                except Exception as e:
-                    logger.warning(f"语音发送失败: {e}")
-                    import traceback
-
-                    logger.error(traceback.format_exc())
-                    # 提供详细的错误信息和解决方案
-                    size_kb = os.path.getsize(voice_path) / 1024
-                    yield event.plain_result(
-                        f"⚠️ 语音发送失败：{e}\n"
-                        f"📁 MP3文件: {voice_path}\n"
-                        f"📊 文件大小: {size_kb:.2f} KB\n\n"
-                        f"🔧 可能的解决方案：\n"
-                        f"1. 安装pydub: pip install pydub\n"
-                        f"2. 安装ffmpeg并添加到PATH"
-                    )
-            else:
-                logger.info("该卡片暂无语音文件")
-
-        except Exception as e:
-            logger.error(f"生日卡片渲染失败: {e}")
-            yield event.plain_result(f"⚠️ 生日卡片渲染失败：{e}")
 
     async def _admin_show_cache_stats(self, event: AstrMessageEvent):
         """显示缓存统计信息"""
