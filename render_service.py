@@ -237,6 +237,7 @@ html, body {{
 </style>
 """
             logger.info("✅ 已注入嵌入式中文字体支持")
+            has_local_font = True
         else:
             # 回退到 Web 字体
             font_css = """
@@ -304,6 +305,7 @@ html, body {
 </script>
 """
             logger.info("✅ 已注入 Web 字体支持（本地字体不存在）")
+            has_local_font = False
 
         # 在 <head> 标签后注入字体 CSS
         if "<head>" in html_content:
@@ -314,7 +316,7 @@ html, body {
             # 如果没有 head 标签，在开头添加
             html_content = font_css + html_content
 
-        return html_content
+        return html_content, has_local_font
 
     async def html_to_image(
         self,
@@ -341,8 +343,9 @@ html, body {
             RuntimeError: 当 Chrome/Chromium 不可用时
         """
         # 注入字体回退支持
+        has_local_font = False
         if inject_fonts:
-            html_content = self._inject_font_fallback(html_content)
+            html_content, has_local_font = self._inject_font_fallback(html_content)
 
         # 检查渲染功能是否可用
         if not self.is_render_available():
@@ -382,12 +385,14 @@ html, body {
         # 使用 url 参数而非 html_str，让浏览器有时间加载远程图片
         file_url = f"file:///{html_path.replace(os.sep, '/')}"
 
-        # 等待一段时间让字体和图片加载
+        # 根据是否使用本地字体调整等待时间
+        # 本地字体已嵌入，等待时间可以缩短；Web字体需要更长加载时间
         import asyncio
+        
+        wait_time = 1.5 if (inject_fonts and has_local_font) else 2.5
+        await asyncio.sleep(wait_time)
 
-        await asyncio.sleep(3)  # 等待3秒让字体和图片预加载
-
-        logger.info(f"🖼️ 开始渲染: {output_file}")
+        logger.info(f"🖼️ 开始渲染: {output_file} (等待{wait_time}s)")
 
         self.hti.screenshot(url=file_url, save_as=output_file, size=(width, 4000))
 

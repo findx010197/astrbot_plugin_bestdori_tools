@@ -16,7 +16,6 @@ class MenuContext:
             (1, "tools", "工具查询", "tools"),
             (2, "admin", "管理功能", "admin"),
             (3, "games", "趣味游戏", "games"),
-            (4, "download", "资源下载", "download"),
         ],
         "tools": [
             (1, "event", "活动查询", "cmd:event"),
@@ -32,7 +31,6 @@ class MenuContext:
             (5, "stats", "播报统计", "cmd:stats"),
             (6, "clear", "清除播报状态", "cmd:clear"),
             (7, "cache", "缓存管理", "cache"),
-            (8, "settings", "目录设置", "settings"),
             (0, "back", "返回上级", "main"),
         ],
         "cache": [
@@ -52,20 +50,6 @@ class MenuContext:
             (1, "confirm_refresh", "确认刷新", "cmd:api_refresh_confirmed"),
             (2, "cancel", "取消操作", "cache"),
         ],
-        "settings": [
-            (1, "show_dirs", "查看目录设置", "cmd:show_dirs"),
-            (2, "set_cache_dir", "设置缓存目录", "input:cache_dir"),
-            (3, "set_download_dir", "设置下载目录", "input:download_dir"),
-            (4, "reset_dirs", "恢复默认目录", "cmd:reset_dirs"),
-            (0, "back", "返回上级", "admin"),
-        ],
-        "download": [
-            (1, "dl_card", "卡面下载", "cmd:dl_card"),
-            (2, "dl_voice", "语音下载", "cmd:dl_voice"),
-            (3, "dl_story", "故事下载", "cmd:dl_story"),
-            (4, "dl_asset", "素材下载", "cmd:dl_asset"),
-            (0, "back", "返回上级", "main"),
-        ],
         "games": [
             (0, "back", "返回上级", "main"),
         ],
@@ -77,13 +61,11 @@ class MenuContext:
         ],
         "card_menu": [
             (1, "search", "角色查询", "cmd:card_query_char"),
-            (2, "new", "最新卡面", "cmd:card_new"),
             (0, "back", "返回上级", "tools"),
         ],
         "card_search": [
             (1, "all", "全部卡面", "cmd:card_search_all"),
-            (2, "new", "最新卡面", "cmd:card_search_new"),
-            (3, "random", "随机抽取", "cmd:card_search_random"),
+            (2, "random", "随机抽取", "cmd:card_search_random"),
             (0, "back", "返回上级", "tools"),
         ],
         "card_list_view": [
@@ -93,7 +75,6 @@ class MenuContext:
         ],
         "card_detail": [
             (1, "illustration", "插画信息", "cmd:card_illustration"),
-            (2, "detail", "详细信息", "cmd:card_detail"),
             (0, "back", "返回上级", "card_list_view"),
         ],
     }

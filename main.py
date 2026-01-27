@@ -1229,21 +1229,6 @@ class BestdoriPlugin(Star):
                     yield result
             else:
                 yield event.plain_result("未找到卡面ID，请先使用 /id xxxx 查询卡面")
-        elif cmd == "card_detail":
-            # 从上下文获取 card_id
-            user_id = event.get_sender_id()
-            group_id = (
-                event.message_obj.group_id
-                if hasattr(event.message_obj, "group_id")
-                else ""
-            )
-            ctx = menu_context.get_context(user_id, group_id)
-            card_id = ctx.get("card_id") if ctx else None
-            if card_id:
-                async for result in self._send_card_detail_page(event, card_id):
-                    yield result
-            else:
-                yield event.plain_result("未找到卡面ID，请先使用 /id xxxx 查询卡面")
         elif cmd == "card_search_all":
             # 从上下文获取 char_id 和 alias
             user_id = event.get_sender_id()
@@ -1267,29 +1252,6 @@ class BestdoriPlugin(Star):
                 # 清除上下文（或者保留？根据需求，一般执行查询后上下文会结束或改变）
                 menu_context.clear_context(user_id, group_id)
 
-                async for result in self._handle_card_search(
-                    event, char_id, char_alias
-                ):
-                    yield result
-            else:
-                yield event.plain_result(
-                    "未找到角色信息，请重新输入 /bd [角色名] 进行查询"
-                )
-        elif cmd == "card_search_new":
-            user_id = event.get_sender_id()
-            group_id = (
-                event.message_obj.group_id
-                if hasattr(event.message_obj, "group_id")
-                else ""
-            )
-            ctx = menu_context.get_context(user_id, group_id)
-            char_id = ctx.get("char_id") if ctx else None
-            char_alias = ctx.get("char_alias", "") if ctx else ""
-            if char_id:
-                fake_args = f"/bd {char_alias} new"
-                event.message_obj.message_str = fake_args
-                event.message_str = fake_args
-                menu_context.clear_context(user_id, group_id)
                 async for result in self._handle_card_search(
                     event, char_id, char_alias
                 ):
@@ -1396,9 +1358,6 @@ class BestdoriPlugin(Star):
         elif level1 == "games":
             async for result in self._handle_games_menu(event, level2, rest_args):
                 yield result
-        elif level1 == "download":
-            async for result in self._handle_download_menu(event, level2, rest_args):
-                yield result
 
         # 直接指令分发 (快捷方式)
         elif level1 in ["card", "卡面", "卡"]:
@@ -1449,7 +1408,7 @@ class BestdoriPlugin(Star):
             "  /bd ksm       - 使用别名查询\n"
             "  /bd ksm all   - 全部卡面列表\n"
             "  /bd ksm random - 随机抽卡\n"
-            "  /id 1234      - 卡面大图详情\n"
+            "  /id 1234      - 卡面HD插画\n"
             "\n"
             "🎂 【生日查询】\n"
             "  /birthday     - 今日生日角色\n"
@@ -1481,13 +1440,12 @@ class BestdoriPlugin(Star):
             "  /1 · tools   - 工具查询\n"
             "  /2 · admin   - 管理功能\n"
             "  /3 · games   - 趣味游戏\n"
-            "  /4 · download - 资源下载\n"
             "\n"
             "⚡ 快捷指令:\n"
             "  /event [cn|jp]  - 当期活动\n"
             "  /birthday [角色] - 生日查询\n"
             "  /bd [角色名]     - 卡面查询\n"
-            "  /id [卡面ID]     - 卡面详情\n"
+            "  /id [卡面ID]     - 卡面插画\n"
             "\n"
             "💡 输入 /bd help 查看详细帮助"
         )
@@ -1947,40 +1905,6 @@ class BestdoriPlugin(Star):
             )
         else:
             yield event.plain_result(f"未知命令: settings {cmd}")
-
-    async def _handle_download_menu(self, event: AstrMessageEvent, cmd: str, args: str):
-        """处理下载功能菜单"""
-        user_id = event.get_sender_id()
-        group_id = (
-            event.message_obj.group_id if hasattr(event.message_obj, "group_id") else ""
-        )
-
-        if not cmd or cmd == "help":
-            menu_context.set_context(user_id, group_id, menu="download")
-            menu_text = (
-                "[ Download - 资源下载 ]\n"
-                "------------------------\n"
-                "  /1 - dl_card - 卡面下载\n"
-                "  /2 - dl_voice - 语音下载\n"
-                "  /3 - dl_story - 故事下载\n"
-                "  /4 - dl_asset - 素材下载\n"
-                "  /0 - back - 返回上级\n"
-                "------------------------\n"
-                "输入 /序号 或 /标识符 继续"
-            )
-            yield event.plain_result(menu_text)
-            return
-
-        if cmd in ["1", "dl_card", "card", "卡面"]:
-            yield event.plain_result("🚧 卡面下载功能开发中...")
-        elif cmd in ["2", "dl_voice", "voice", "语音"]:
-            yield event.plain_result("🚧 语音下载功能开发中...")
-        elif cmd in ["3", "dl_story", "story", "故事"]:
-            yield event.plain_result("🚧 故事下载功能开发中...")
-        elif cmd in ["4", "dl_asset", "asset", "素材"]:
-            yield event.plain_result("🚧 素材下载功能开发中...")
-        else:
-            yield event.plain_result(f"未知命令: download {cmd}")
 
     async def _admin_show_subscribers(self, event: AstrMessageEvent):
         """显示订阅用户列表"""
