@@ -890,23 +890,16 @@ class BestdoriPlugin(Star):
     # ==================== 卡面ID查询命令 ====================
 
     @filter.command("id")
-    async def shortcut_card_id(self, event: AstrMessageEvent, *args):
+    async def shortcut_card_id(self, event: AstrMessageEvent):
         """卡面ID查询命令 /id xxxx - 转发到统一处理"""
         # 从消息文本解析卡面ID
         card_id_str = ""
-        if args:
-            for arg in args:
-                if str(arg).isdigit():
-                    card_id_str = str(arg)
-                    break
-
-        if not card_id_str:
-            message = event.message_str.strip()
-            parts = message.split()
-            for part in parts:
-                if part.isdigit():
-                    card_id_str = part
-                    break
+        message = event.message_str.strip()
+        parts = message.split()
+        for part in parts:
+            if part.isdigit():
+                card_id_str = part
+                break
 
         # 调用统一的处理方法
         async for result in self._handle_card_id_query(event, card_id_str):
@@ -3198,8 +3191,13 @@ class BestdoriPlugin(Star):
                 async for result in self._render_card_list(event, char_id, all_cards):
                     yield result
             elif mode == "new":
-                # 显示最新的一张
-                async for result in self._send_card_detail(event, filtered[0]):
+                # 显示最新的一张（filtered 已按 ID 倒序，但需要重新确保排序）
+                filtered.sort(key=lambda x: x.card_id, reverse=True)
+                newest_card = filtered[0]
+                yield event.plain_result(
+                    f"📍 找到 {official_name} 的最新卡面: ID {newest_card.card_id}"
+                )
+                async for result in self._send_card_detail(event, newest_card):
                     yield result
             elif mode == "random":
                 import random
@@ -3500,24 +3498,40 @@ class BestdoriPlugin(Star):
 
         # 1. 特训前
         url_normal = card.get_card_icon_url("rip_normal")
+        logger.info(f"[CardDetail] 特训前URL: {url_normal}")
         if url_normal:
             path = await self.client.download_image(url_normal)
             if path:
+                logger.info(f"[CardDetail] 特训前下载成功: {path}")
                 # 应用清晰度增强
                 enhanced_path = enhance_card_image(path, enhanced_dir)
                 yield event.plain_result("📷 特训前插画 (HD):")
                 yield event.image_result(enhanced_path)
+            else:
+                logger.warning("[CardDetail] 特训前下载失败")
+                yield event.plain_result("⚠️ 特训前插画获取失败")
+        else:
+            yield event.plain_result("⚠️ 未找到特训前插画URL")
 
         # 2. 特训后
         if card.rarity >= 3:
             url_trained = card.get_card_icon_url("rip_trained")
+            logger.info(f"[CardDetail] 特训后URL: {url_trained}")
             if url_trained:
                 path = await self.client.download_image(url_trained)
                 if path:
+                    logger.info(f"[CardDetail] 特训后下载成功: {path}")
                     # 应用清晰度增强
                     enhanced_path = enhance_card_image(path, enhanced_dir)
                     yield event.plain_result("📷 特训后插画 (HD):")
                     yield event.image_result(enhanced_path)
+                else:
+                    logger.warning("[CardDetail] 特训后下载失败")
+                    yield event.plain_result("⚠️ 特训后插画获取失败")
+            else:
+                yield event.plain_result("⚠️ 未找到特训后插画URL")
+        else:
+            yield event.plain_result(f"ℹ️ {card.rarity}星卡面无特训后插画")
 
     async def _send_card_illustration(self, event: AstrMessageEvent, card_id: int):
         """发送卡面的插画信息（特训前后两张rip大图）"""
