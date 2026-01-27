@@ -39,7 +39,15 @@ class ResourceManager:
         self.birthday_service = birthday_service
 
         # 确保目录存在
-        for subdir in ["bands", "attributes", "stars", "chibi", "frames", "costumes", "card_thumbs"]:
+        for subdir in [
+            "bands",
+            "attributes",
+            "stars",
+            "chibi",
+            "frames",
+            "costumes",
+            "card_thumbs",
+        ]:
             (self.assets_dir / subdir).mkdir(parents=True, exist_ok=True)
 
     async def _download_file(self, url: str, path: Path, force: bool = False) -> bool:
@@ -60,7 +68,9 @@ class ResourceManager:
 
         try:
             logger.info(f"正在下载: {url} -> {path}")
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as session:
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         path.parent.mkdir(parents=True, exist_ok=True)
@@ -117,7 +127,11 @@ class ResourceManager:
             attributes = ["happy", "cool", "pure", "powerful"]
             for attr in attributes:
                 file_path = self.assets_dir / "attributes" / f"{attr}.svg"
-                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                if (
+                    check_existing
+                    and file_path.exists()
+                    and file_path.stat().st_size > 0
+                ):
                     skip_count += 1
                     continue
 
@@ -140,7 +154,11 @@ class ResourceManager:
             ]
             for filename, url in star_files:
                 file_path = self.assets_dir / "stars" / filename
-                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                if (
+                    check_existing
+                    and file_path.exists()
+                    and file_path.stat().st_size > 0
+                ):
                     star_skip += 1
                     skip_count += 1
                     continue
@@ -160,7 +178,11 @@ class ResourceManager:
             band_skip = 0
             for band_id, svg_name in BAND_ICON_URL_MAP.items():
                 file_path = self.assets_dir / "bands" / f"band_{band_id}.svg"
-                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                if (
+                    check_existing
+                    and file_path.exists()
+                    and file_path.stat().st_size > 0
+                ):
                     band_skip += 1
                     skip_count += 1
                     continue
@@ -179,7 +201,11 @@ class ResourceManager:
             chibi_skip = 0
             for char_id in ALL_CHARACTERS:
                 file_path = self.assets_dir / "chibi" / f"chibi_{char_id}.png"
-                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                if (
+                    check_existing
+                    and file_path.exists()
+                    and file_path.stat().st_size > 0
+                ):
                     chibi_skip += 1
                     skip_count += 1
                     continue
@@ -196,7 +222,7 @@ class ResourceManager:
             print("\n🖼️ [5/5] 下载卡面边框...")
             frame_success = 0
             frame_skip = 0
-            
+
             # frame-X 系列 (用于大图)
             frame_files = [
                 ("frame-2.png", f"{BESTDORI_IMAGE_BASE}/frame-2.png"),
@@ -208,7 +234,7 @@ class ResourceManager:
                 frame_files.append(
                     (f"frame-1-{attr}.png", f"{BESTDORI_IMAGE_BASE}/frame-1-{attr}.png")
                 )
-            
+
             # card-X 系列 (用于缩略图)
             card_frame_files = [
                 ("card-2.png", f"{BESTDORI_IMAGE_BASE}/card-2.png"),
@@ -219,11 +245,15 @@ class ResourceManager:
                 card_frame_files.append(
                     (f"card-1-{attr}.png", f"{BESTDORI_IMAGE_BASE}/card-1-{attr}.png")
                 )
-            
+
             all_frame_files = frame_files + card_frame_files
             for filename, url in all_frame_files:
                 file_path = self.assets_dir / "frames" / filename
-                if check_existing and file_path.exists() and file_path.stat().st_size > 0:
+                if (
+                    check_existing
+                    and file_path.exists()
+                    and file_path.stat().st_size > 0
+                ):
                     frame_skip += 1
                     skip_count += 1
                     continue
@@ -237,22 +267,23 @@ class ResourceManager:
 
             # 打印汇总
             print("\n" + "=" * 50)
-            print(f"📊 基础素材下载汇总:")
+            print("📊 基础素材下载汇总:")
             print(f"   已存在: {skip_count} 个")
             print(f"   新下载: {success_count} 个")
             print(f"   失败:   {fail_count} 个")
-            
+
             if fail_count == 0:
                 print("✅ 基础素材全部就绪!")
             else:
                 print(f"⚠️ 有 {fail_count} 个素材下载失败，请检查网络")
             print("=" * 50)
-            
+
             return fail_count == 0
 
         except Exception as e:
             print(f"❌ 基础素材下载失败: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 
@@ -271,7 +302,7 @@ class ResourceManager:
             return True
 
         print(f"\n👗 开始下载 Live2D 服装小人 (共 {len(costumes_data)} 个)...")
-        
+
         costume_dir = self.assets_dir / "costumes"
         costume_dir.mkdir(parents=True, exist_ok=True)
 
@@ -294,7 +325,7 @@ class ResourceManager:
 
                 # 计算服装分组
                 group = costume_id // 50
-                
+
                 # 尝试多个服务器
                 downloaded = False
                 for server in ["cn", "jp", "en", "tw", "kr"]:
@@ -303,7 +334,7 @@ class ResourceManager:
                         success_count += 1
                         downloaded = True
                         break
-                
+
                 if not downloaded:
                     fail_count += 1
 
@@ -311,7 +342,9 @@ class ResourceManager:
                 logger.warning(f"下载服装 {costume_id_str} 失败: {e}")
                 fail_count += 1
 
-        print(f"   服装下载完成: 已有/成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}")
+        print(
+            f"   服装下载完成: 已有/成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}"
+        )
         return fail_count == 0
 
     async def download_card_thumbs(self, cards_data: dict = None) -> bool:
@@ -329,7 +362,7 @@ class ResourceManager:
             return True
 
         print(f"\n🃏 开始下载卡面缩略图 (共 {len(cards_data)} 张)...")
-        
+
         thumb_dir = self.assets_dir / "card_thumbs"
         thumb_dir.mkdir(parents=True, exist_ok=True)
 
@@ -359,7 +392,7 @@ class ResourceManager:
                         if await self._download_file(url, file_path):
                             downloaded = True
                             break
-                    
+
                     if downloaded:
                         success_count += 1
                     else:
@@ -371,7 +404,7 @@ class ResourceManager:
                                 if await self._download_file(url, file_path):
                                     downloaded = True
                                     break
-                        
+
                         if not downloaded:
                             fail_count += 1
                 else:
@@ -381,16 +414,18 @@ class ResourceManager:
                 logger.warning(f"下载卡面 {card_id_str} 缩略图失败: {e}")
                 fail_count += 1
 
-        print(f"   卡面缩略图下载完成: 已有/成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}")
+        print(
+            f"   卡面缩略图下载完成: 已有/成功 {success_count}, 失败 {fail_count}, 跳过 {skip_count}"
+        )
         return fail_count == 0
 
     def get_local_chibi(self, char_id: int) -> str:
         """
         获取本地 chibi 图标的 base64 data URI
-        
+
         Args:
             char_id: 角色 ID
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -407,10 +442,10 @@ class ResourceManager:
     def get_local_frame(self, frame_name: str) -> str:
         """
         获取本地边框图片的 base64 data URI
-        
+
         Args:
             frame_name: 边框文件名 (如 "frame-4.png" 或 "card-3.png")
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -427,10 +462,10 @@ class ResourceManager:
     def get_local_costume(self, costume_id: int) -> str:
         """
         获取本地服装小人的 base64 data URI
-        
+
         Args:
             costume_id: 服装 ID
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -447,11 +482,11 @@ class ResourceManager:
     def get_local_card_thumb(self, card_id: int, trained: bool = True) -> str:
         """
         获取本地卡面缩略图的 base64 data URI
-        
+
         Args:
             card_id: 卡面 ID
             trained: 是否为特训后
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -463,16 +498,18 @@ class ResourceManager:
                     data = base64.b64encode(f.read()).decode("utf-8")
                 return f"data:image/png;base64,{data}"
             except Exception as e:
-                logger.warning(f"读取本地卡面缩略图 card_{card_id}_{suffix}.png 失败: {e}")
+                logger.warning(
+                    f"读取本地卡面缩略图 card_{card_id}_{suffix}.png 失败: {e}"
+                )
         return None
 
     def get_local_attribute(self, attr: str) -> str:
         """
         获取本地属性图标的 base64 data URI
-        
+
         Args:
             attr: 属性名 (happy, cool, pure, powerful)
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -489,10 +526,10 @@ class ResourceManager:
     def get_local_band(self, band_id: int) -> str:
         """
         获取本地乐队图标的 base64 data URI
-        
+
         Args:
             band_id: 乐队 ID
-            
+
         Returns:
             base64 data URI 或 None
         """
@@ -593,7 +630,14 @@ class ResourceManager:
 
         # 检查边框
         frame_dir = self.assets_dir / "frames"
-        frame_files = ["frame-2.png", "frame-3.png", "frame-4.png", "card-2.png", "card-3.png", "card-4.png"]
+        frame_files = [
+            "frame-2.png",
+            "frame-3.png",
+            "frame-4.png",
+            "card-2.png",
+            "card-3.png",
+            "card-4.png",
+        ]
         for attr in ATTRIBUTES:
             frame_files.extend([f"frame-1-{attr}.png", f"card-1-{attr}.png"])
         for frame_file in frame_files:
@@ -692,7 +736,7 @@ class ResourceManager:
         """
         首次运行时的资源检查
         始终检查关键资源是否存在，缺失则下载
-        
+
         Args:
             client: BestdoriClient 实例，用于获取卡面和服装数据
         """
@@ -716,29 +760,37 @@ class ResourceManager:
                 try:
                     # 检查是否需要下载卡面缩略图
                     thumb_dir = self.assets_dir / "card_thumbs"
-                    existing_thumbs = len(list(thumb_dir.glob("*.png"))) if thumb_dir.exists() else 0
-                    
+                    existing_thumbs = (
+                        len(list(thumb_dir.glob("*.png"))) if thumb_dir.exists() else 0
+                    )
+
                     # 检查是否需要下载服装
                     costume_dir = self.assets_dir / "costumes"
-                    existing_costumes = len(list(costume_dir.glob("*.png"))) if costume_dir.exists() else 0
-                    
+                    existing_costumes = (
+                        len(list(costume_dir.glob("*.png")))
+                        if costume_dir.exists()
+                        else 0
+                    )
+
                     # 只在首次或资源很少时下载
                     if existing_thumbs < 100:
-                        print(f"\n📥 开始下载卡面缩略图（首次运行可能需要几分钟）...")
+                        print("\n📥 开始下载卡面缩略图（首次运行可能需要几分钟）...")
                         cards_data = await client.get_cards()
                         if cards_data:
                             await self.download_card_thumbs(cards_data)
                     else:
                         print(f"✅ 卡面缩略图: 已有 {existing_thumbs} 张")
-                    
+
                     if existing_costumes < 50:
-                        print(f"📥 开始下载 Live2D 服装小人（首次运行可能需要几分钟）...")
+                        print(
+                            "📥 开始下载 Live2D 服装小人（首次运行可能需要几分钟）..."
+                        )
                         costumes_data = await client.get_costumes()
                         if costumes_data:
                             await self.download_all_costumes(costumes_data)
                     else:
                         print(f"✅ Live2D 服装: 已有 {existing_costumes} 个")
-                        
+
                 except Exception as e:
                     print(f"⚠️ 下载扩展资源失败（不影响基本功能）: {e}")
 
@@ -753,32 +805,45 @@ class ResourceManager:
         except Exception as e:
             print(f"❌ 资源检查失败: {e}")
             import traceback
+
             traceback.print_exc()
 
     def _report_existing_assets(self):
         """报告已存在的资源"""
         print("\n📦 已安装的基础素材:")
-        
+
         # 属性图标
-        attr_count = sum(1 for attr in ATTRIBUTES 
-                        if (self.assets_dir / "attributes" / f"{attr}.svg").exists())
+        attr_count = sum(
+            1
+            for attr in ATTRIBUTES
+            if (self.assets_dir / "attributes" / f"{attr}.svg").exists()
+        )
         print(f"   🎨 属性图标: {attr_count}/{len(ATTRIBUTES)}")
-        
+
         # 星级图标
-        star_count = sum(1 for f in ["star.png", "star_trained.png"]
-                        if (self.assets_dir / "stars" / f).exists())
+        star_count = sum(
+            1
+            for f in ["star.png", "star_trained.png"]
+            if (self.assets_dir / "stars" / f).exists()
+        )
         print(f"   ⭐ 星级图标: {star_count}/2")
-        
+
         # 乐队图标
-        band_count = sum(1 for bid in BAND_ICON_URL_MAP
-                        if (self.assets_dir / "bands" / f"band_{bid}.svg").exists())
+        band_count = sum(
+            1
+            for bid in BAND_ICON_URL_MAP
+            if (self.assets_dir / "bands" / f"band_{bid}.svg").exists()
+        )
         print(f"   🎸 乐队图标: {band_count}/{len(BAND_ICON_URL_MAP)}")
-        
+
         # Chibi 图标
-        chibi_count = sum(1 for cid in ALL_CHARACTERS
-                        if (self.assets_dir / "chibi" / f"chibi_{cid}.png").exists())
+        chibi_count = sum(
+            1
+            for cid in ALL_CHARACTERS
+            if (self.assets_dir / "chibi" / f"chibi_{cid}.png").exists()
+        )
         print(f"   👤 Chibi 图标: {chibi_count}/{len(ALL_CHARACTERS)}")
-        
+
         # 边框
         frame_dir = self.assets_dir / "frames"
         frame_count = len(list(frame_dir.glob("*.png"))) if frame_dir.exists() else 0
@@ -787,43 +852,57 @@ class ResourceManager:
     def _verify_and_report_assets(self):
         """验证并报告资源状态"""
         all_ok = True
-        
+
         # 验证属性图标
-        missing_attrs = [attr for attr in ATTRIBUTES 
-                        if not (self.assets_dir / "attributes" / f"{attr}.svg").exists()]
+        missing_attrs = [
+            attr
+            for attr in ATTRIBUTES
+            if not (self.assets_dir / "attributes" / f"{attr}.svg").exists()
+        ]
         if missing_attrs:
             print(f"   ❌ 缺失属性图标: {missing_attrs}")
             all_ok = False
         else:
-            print(f"   ✅ 属性图标: 全部就绪 (4/4)")
-        
+            print("   ✅ 属性图标: 全部就绪 (4/4)")
+
         # 验证星级图标
-        missing_stars = [f for f in ["star.png", "star_trained.png"]
-                        if not (self.assets_dir / "stars" / f).exists()]
+        missing_stars = [
+            f
+            for f in ["star.png", "star_trained.png"]
+            if not (self.assets_dir / "stars" / f).exists()
+        ]
         if missing_stars:
             print(f"   ❌ 缺失星级图标: {missing_stars}")
             all_ok = False
         else:
-            print(f"   ✅ 星级图标: 全部就绪 (2/2)")
-        
+            print("   ✅ 星级图标: 全部就绪 (2/2)")
+
         # 验证乐队图标
-        missing_bands = [bid for bid in BAND_ICON_URL_MAP
-                        if not (self.assets_dir / "bands" / f"band_{bid}.svg").exists()]
+        missing_bands = [
+            bid
+            for bid in BAND_ICON_URL_MAP
+            if not (self.assets_dir / "bands" / f"band_{bid}.svg").exists()
+        ]
         if missing_bands:
             print(f"   ❌ 缺失乐队图标: {missing_bands}")
             all_ok = False
         else:
-            print(f"   ✅ 乐队图标: 全部就绪 ({len(BAND_ICON_URL_MAP)}/{len(BAND_ICON_URL_MAP)})")
-        
+            print(
+                f"   ✅ 乐队图标: 全部就绪 ({len(BAND_ICON_URL_MAP)}/{len(BAND_ICON_URL_MAP)})"
+            )
+
         # 验证 Chibi 图标
-        missing_chibis = [cid for cid in ALL_CHARACTERS
-                         if not (self.assets_dir / "chibi" / f"chibi_{cid}.png").exists()]
+        missing_chibis = [
+            cid
+            for cid in ALL_CHARACTERS
+            if not (self.assets_dir / "chibi" / f"chibi_{cid}.png").exists()
+        ]
         if missing_chibis:
             print(f"   ⚠️ 缺失 Chibi 图标: {len(missing_chibis)} 个")
             all_ok = False
         else:
-            print(f"   ✅ Chibi 图标: 全部就绪 (45/45)")
-        
+            print("   ✅ Chibi 图标: 全部就绪 (45/45)")
+
         # 验证边框
         frame_dir = self.assets_dir / "frames"
         frame_count = len(list(frame_dir.glob("*.png"))) if frame_dir.exists() else 0
@@ -832,18 +911,20 @@ class ResourceManager:
         else:
             print(f"   ⚠️ 边框图标: {frame_count}/14")
             all_ok = False
-        
+
         # 卡面缩略图和服装
         thumb_dir = self.assets_dir / "card_thumbs"
         thumb_count = len(list(thumb_dir.glob("*.png"))) if thumb_dir.exists() else 0
         if thumb_count > 0:
             print(f"   📷 卡面缩略图: {thumb_count} 张")
-        
+
         costume_dir = self.assets_dir / "costumes"
-        costume_count = len(list(costume_dir.glob("*.png"))) if costume_dir.exists() else 0
+        costume_count = (
+            len(list(costume_dir.glob("*.png"))) if costume_dir.exists() else 0
+        )
         if costume_count > 0:
             print(f"   👗 Live2D 服装: {costume_count} 个")
-        
+
         return all_ok
 
     def _quick_check_basic_assets(self) -> bool:

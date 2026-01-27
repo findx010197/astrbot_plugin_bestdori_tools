@@ -159,7 +159,7 @@ class BestdoriClient:
                     idx = parts.index("resourceset")
                     prefix = parts[idx + 1]
                     filename = f"{prefix}_{parts[-1]}"
-                except:
+                except Exception:
                     filename = f"{parts[-3]}_{parts[-1]}"
             elif "images_rip" in url:
                 filename = f"{parts[-3]}_{parts[-1]}"
@@ -231,7 +231,7 @@ class BestdoriClient:
                             if os.path.exists(file_path):
                                 try:
                                     os.remove(file_path)
-                                except:
+                                except Exception:
                                     pass
                             continue
 
@@ -247,7 +247,7 @@ class BestdoriClient:
                 if os.path.exists(file_path):
                     try:
                         os.remove(file_path)
-                    except:
+                    except Exception:
                         pass
 
         # 所有尝试都失败

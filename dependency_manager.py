@@ -30,12 +30,15 @@ class DependencyManager:
         self.optional_packages = {
             "ffmpeg-python": "ffmpeg-python>=0.2.0",
         }
-        
+
         # 中文字体包（不同发行版的包名）
         self.font_packages = {
             "apt": ["fonts-noto-cjk", "fonts-wqy-microhei"],  # Debian/Ubuntu
             "apk": ["font-noto-cjk"],  # Alpine
-            "yum": ["google-noto-sans-cjk-ttc-fonts", "wqy-microhei-fonts"],  # CentOS/RHEL
+            "yum": [
+                "google-noto-sans-cjk-ttc-fonts",
+                "wqy-microhei-fonts",
+            ],  # CentOS/RHEL
             "dnf": ["google-noto-sans-cjk-ttc-fonts", "wqy-microhei-fonts"],  # Fedora
         }
 
@@ -162,14 +165,14 @@ class DependencyManager:
 
         # 1. 检查并安装 Chrome/Chromium（html2image需要）
         chrome_found = self._check_chrome_browser()
-        
+
         if not chrome_found and sys.platform.startswith("linux"):
             # Linux 环境尝试自动安装 Chromium
             print("🔍 未检测到 Chromium 浏览器，尝试自动安装...")
             chrome_found = self._install_chromium()
-        
+
         system_deps["chrome_or_chromium"] = chrome_found
-        
+
         if not chrome_found:
             print("⚠️ 未检测到 Chrome/Chromium 浏览器，HTML 渲染功能将不可用")
             if sys.platform.startswith("linux"):
@@ -201,7 +204,12 @@ class DependencyManager:
             return False
         else:
             # Linux: 使用 which 命令检查
-            for browser in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
+            for browser in [
+                "chromium",
+                "chromium-browser",
+                "google-chrome",
+                "google-chrome-stable",
+            ]:
                 if shutil.which(browser):
                     return True
             return False
@@ -209,7 +217,7 @@ class DependencyManager:
     def _install_chromium(self) -> bool:
         """
         自动安装 Chromium 浏览器（仅 Linux）
-        
+
         Returns:
             是否安装成功
         """
@@ -217,7 +225,7 @@ class DependencyManager:
         if not pm:
             print("⚠️ 未检测到支持的包管理器，无法自动安装 Chromium")
             return False
-        
+
         # 不同包管理器的 Chromium 包名
         chromium_packages = {
             "apt": ["chromium", "chromium-browser"],  # Debian/Ubuntu，不同版本包名不同
@@ -225,25 +233,25 @@ class DependencyManager:
             "yum": ["chromium"],  # CentOS
             "dnf": ["chromium"],  # Fedora
         }
-        
+
         packages = chromium_packages.get(pm, ["chromium"])
-        
+
         # 尝试安装（可能需要尝试不同的包名）
         for pkg in packages:
             print(f"📦 尝试安装 {pkg}...")
             if self._install_system_packages(pm, [pkg]):
                 # 验证安装是否成功
                 if self._check_chrome_browser():
-                    print(f"✅ Chromium 安装成功")
+                    print("✅ Chromium 安装成功")
                     return True
-        
+
         print("❌ Chromium 安装失败")
         return False
 
     def _check_chinese_fonts_installed(self) -> bool:
         """
         检查系统是否安装了中文字体
-        
+
         Returns:
             是否安装了中文字体
         """
@@ -256,30 +264,27 @@ class DependencyManager:
             "/usr/share/fonts/truetype/droid",
             "/usr/share/fonts/google-noto-cjk",
         ]
-        
+
         for font_dir in font_dirs:
             if os.path.exists(font_dir) and os.listdir(font_dir):
                 return True
-        
+
         # 使用 fc-list 检查中文字体
         try:
             result = subprocess.run(
-                ["fc-list", ":lang=zh"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["fc-list", ":lang=zh"], capture_output=True, text=True, timeout=10
             )
             if result.returncode == 0 and result.stdout.strip():
                 return True
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
-        
+
         return False
 
     def _detect_package_manager(self) -> str:
         """
         检测系统使用的包管理器
-        
+
         Returns:
             包管理器名称 (apt, apk, yum, dnf) 或空字符串
         """
@@ -293,7 +298,7 @@ class DependencyManager:
     def _check_and_install_chinese_fonts(self) -> bool:
         """
         检查并自动安装中文字体
-        
+
         Returns:
             是否成功（已安装或安装成功）
         """
@@ -301,7 +306,7 @@ class DependencyManager:
         if self._check_chinese_fonts_installed():
             print("✅ 中文字体已安装")
             return True
-        
+
         # 检查本地字体目录
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         local_font = os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.otf")
@@ -310,9 +315,9 @@ class DependencyManager:
             # 配置到系统
             self._configure_local_fonts(os.path.dirname(local_font))
             return True
-        
+
         print("🔍 未检测到中文字体，尝试自动安装...")
-        
+
         # 检测包管理器
         pm = self._detect_package_manager()
         if not pm:
@@ -322,16 +327,16 @@ class DependencyManager:
             print("   Alpine: apk add font-noto-cjk")
             print("   CentOS/Fedora: dnf install -y google-noto-sans-cjk-ttc-fonts")
             return False
-        
+
         # 获取对应的字体包
         font_packages = self.font_packages.get(pm, [])
         if not font_packages:
             print(f"⚠️ 未知的包管理器 {pm}，无法自动安装字体")
             return False
-        
+
         # 尝试安装字体
         success = self._install_system_packages(pm, font_packages)
-        
+
         if success:
             # 刷新字体缓存
             self._refresh_font_cache()
@@ -345,11 +350,11 @@ class DependencyManager:
     def _install_system_packages(self, pm: str, packages: List[str]) -> bool:
         """
         使用系统包管理器安装软件包
-        
+
         Args:
             pm: 包管理器名称
             packages: 要安装的包列表
-            
+
         Returns:
             是否安装成功
         """
@@ -360,7 +365,7 @@ class DependencyManager:
                 print("📦 更新软件包列表...")
                 update_cmd = ["apt-get", "update", "-qq"]
                 subprocess.run(update_cmd, capture_output=True, timeout=120)
-                
+
                 install_cmd = ["apt-get", "install", "-y", "-qq"] + packages
             elif pm == "apk":
                 install_cmd = ["apk", "add", "--no-cache"] + packages
@@ -368,33 +373,33 @@ class DependencyManager:
                 install_cmd = [pm, "install", "-y"] + packages
             else:
                 return False
-            
+
             print(f"📦 安装字体包: {' '.join(packages)}")
             result = subprocess.run(
                 install_cmd,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5分钟超时
+                timeout=300,  # 5分钟超时
             )
-            
+
             if result.returncode == 0:
                 return True
             else:
                 # 可能需要 root 权限，尝试使用 sudo
-                if "Permission denied" in result.stderr or "permission" in result.stderr.lower():
+                if (
+                    "Permission denied" in result.stderr
+                    or "permission" in result.stderr.lower()
+                ):
                     print("🔐 需要 root 权限，尝试使用 sudo...")
                     sudo_cmd = ["sudo"] + install_cmd
                     result = subprocess.run(
-                        sudo_cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=300
+                        sudo_cmd, capture_output=True, text=True, timeout=300
                     )
                     return result.returncode == 0
-                
+
                 print(f"安装错误: {result.stderr}")
                 return False
-                
+
         except subprocess.TimeoutExpired:
             print("⏰ 安装超时")
             return False
@@ -409,11 +414,7 @@ class DependencyManager:
         """刷新字体缓存"""
         try:
             print("🔄 刷新字体缓存...")
-            subprocess.run(
-                ["fc-cache", "-f"],
-                capture_output=True,
-                timeout=60
-            )
+            subprocess.run(["fc-cache", "-f"], capture_output=True, timeout=60)
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass  # fc-cache 不是必需的
 
@@ -422,59 +423,71 @@ class DependencyManager:
         下载中文字体到本地作为备选方案
         当系统包管理器安装失败时使用
         优先下载 woff2 格式（更小），回退到 OTF 格式
-        
+
         Returns:
             是否下载成功
         """
         try:
             import aiohttp
-            
+
             # 字体保存目录
             plugin_dir = os.path.dirname(os.path.abspath(__file__))
             fonts_dir = os.path.join(plugin_dir, "data", "fonts")
             os.makedirs(fonts_dir, exist_ok=True)
-            
+
             # 检查是否已存在任何字体文件
             woff2_file = os.path.join(fonts_dir, "NotoSansSC-Regular.woff2")
             otf_file = os.path.join(fonts_dir, "NotoSansSC-Regular.otf")
-            
+
             if os.path.exists(woff2_file) and os.path.getsize(woff2_file) > 100000:
                 print(f"✅ 本地字体已存在: {woff2_file}")
                 return True
             if os.path.exists(otf_file) and os.path.getsize(otf_file) > 1000000:
                 print(f"✅ 本地字体已存在: {otf_file}")
                 return True
-            
+
             # 字体 URL 列表（优先 woff2，回退 OTF）
             font_urls = [
                 # Google Fonts woff2 (小，约1-2MB)
-                ("NotoSansSC-Regular.woff2", "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2"),
+                (
+                    "NotoSansSC-Regular.woff2",
+                    "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2",
+                ),
                 # GitHub OTF (大，约16MB，作为备选)
-                ("NotoSansSC-Regular.otf", "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf"),
+                (
+                    "NotoSansSC-Regular.otf",
+                    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf",
+                ),
             ]
-            
-            print(f"📥 正在下载中文字体...")
-            
+
+            print("📥 正在下载中文字体...")
+
             async with aiohttp.ClientSession() as session:
                 for filename, font_url in font_urls:
                     try:
                         font_file = os.path.join(fonts_dir, filename)
                         print(f"   尝试下载: {filename}...")
-                        
-                        async with session.get(font_url, timeout=aiohttp.ClientTimeout(total=120)) as resp:
+
+                        async with session.get(
+                            font_url, timeout=aiohttp.ClientTimeout(total=120)
+                        ) as resp:
                             if resp.status == 200:
                                 content = await resp.read()
-                                
+
                                 # 验证内容大小（woff2 应该大于 100KB，OTF 大于 1MB）
-                                min_size = 100000 if filename.endswith(".woff2") else 1000000
+                                min_size = (
+                                    100000 if filename.endswith(".woff2") else 1000000
+                                )
                                 if len(content) < min_size:
-                                    print(f"   ⚠️ 文件太小，跳过")
+                                    print("   ⚠️ 文件太小，跳过")
                                     continue
-                                
+
                                 with open(font_file, "wb") as f:
                                     f.write(content)
-                                print(f"✅ 字体下载成功: {font_file} ({len(content)} bytes)")
-                                
+                                print(
+                                    f"✅ 字体下载成功: {font_file} ({len(content)} bytes)"
+                                )
+
                                 # 配置本地字体目录
                                 self._configure_local_fonts(fonts_dir)
                                 return True
@@ -482,10 +495,10 @@ class DependencyManager:
                                 print(f"   ⚠️ HTTP {resp.status}，尝试下一个源...")
                     except Exception as e:
                         print(f"   ⚠️ 下载失败: {e}，尝试下一个源...")
-            
-            print(f"❌ 所有字体源下载失败")
+
+            print("❌ 所有字体源下载失败")
             return False
-                        
+
         except Exception as e:
             print(f"❌ 字体下载异常: {e}")
             return False
@@ -493,7 +506,7 @@ class DependencyManager:
     def _configure_local_fonts(self, fonts_dir: str):
         """
         配置本地字体目录到 fontconfig
-        
+
         Args:
             fonts_dir: 字体目录路径
         """
@@ -502,7 +515,7 @@ class DependencyManager:
             home = os.path.expanduser("~")
             local_fonts_dir = os.path.join(home, ".fonts")
             os.makedirs(local_fonts_dir, exist_ok=True)
-            
+
             # 创建符号链接到我们的字体目录
             for font_file in os.listdir(fonts_dir):
                 if font_file.endswith((".ttf", ".otf", ".woff2")):
@@ -514,12 +527,13 @@ class DependencyManager:
                         except OSError:
                             # 符号链接失败，尝试复制
                             import shutil
+
                             shutil.copy2(src, dst)
-            
+
             # 刷新字体缓存
             self._refresh_font_cache()
             print(f"✅ 已配置本地字体目录: {local_fonts_dir}")
-            
+
         except Exception as e:
             print(f"⚠️ 配置本地字体目录失败: {e}")
 

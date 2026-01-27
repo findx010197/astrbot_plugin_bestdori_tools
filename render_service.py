@@ -22,7 +22,7 @@ class RenderService:
 
         # 尝试自动查找浏览器路径
         self._detect_browser()
-        
+
         # 检测中文字体
         self._check_chinese_fonts()
 
@@ -59,23 +59,23 @@ class RenderService:
         if sys.platform.startswith("win"):
             # Windows 通常有中文字体支持
             return
-        
+
         # Linux: 检查常见的中文字体文件
         font_paths = [
             "/usr/share/fonts/opentype/noto",  # Noto CJK
             "/usr/share/fonts/truetype/noto",
-            "/usr/share/fonts/truetype/wqy",   # 文泉驿
-            "/usr/share/fonts/truetype/droid", # Droid
-            "/usr/share/fonts/noto-cjk",       # Alpine
+            "/usr/share/fonts/truetype/wqy",  # 文泉驿
+            "/usr/share/fonts/truetype/droid",  # Droid
+            "/usr/share/fonts/noto-cjk",  # Alpine
         ]
-        
+
         has_chinese_font = False
         for font_path in font_paths:
             if os.path.exists(font_path):
                 has_chinese_font = True
                 logger.info(f"检测到中文字体目录: {font_path}")
                 break
-        
+
         if not has_chinese_font:
             logger.warning(
                 "⚠️ 未检测到中文字体，渲染的图片中文可能显示为方块！\n"
@@ -143,25 +143,25 @@ class RenderService:
     def _get_local_font_base64(self) -> str:
         """
         获取本地字体的 base64 编码
-        
+
         Returns:
             字体的 base64 编码，如果本地不存在则返回 None
         """
         import base64
-        
+
         # 检查本地字体文件
         plugin_dir = os.path.dirname(os.path.abspath(__file__))
         font_paths = [
             os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.otf"),
             os.path.join(plugin_dir, "data", "fonts", "NotoSansSC-Regular.woff2"),
         ]
-        
+
         for font_path in font_paths:
             if os.path.exists(font_path) and os.path.getsize(font_path) > 100000:
                 try:
                     with open(font_path, "rb") as f:
                         font_data = f.read()
-                    
+
                     # 确定字体格式
                     if font_path.endswith(".woff2"):
                         font_format = "woff2"
@@ -172,32 +172,34 @@ class RenderService:
                     else:
                         font_format = "truetype"
                         mime_type = "font/ttf"
-                    
+
                     b64 = base64.b64encode(font_data).decode("utf-8")
-                    logger.info(f"✅ 已加载本地字体: {font_path} ({len(font_data)} bytes)")
+                    logger.info(
+                        f"✅ 已加载本地字体: {font_path} ({len(font_data)} bytes)"
+                    )
                     return f"data:{mime_type};base64,{b64}", font_format
                 except Exception as e:
                     logger.warning(f"读取本地字体失败 {font_path}: {e}")
-        
+
         return None, None
 
     def _inject_font_fallback(self, html_content: str) -> str:
         """
         为 HTML 注入中文字体回退支持
         优先使用本地嵌入的字体，回退到 Web 字体
-        
+
         Args:
             html_content: 原始 HTML 内容
-            
+
         Returns:
             注入字体支持后的 HTML
         """
         # 尝试获取本地字体
         local_font_data, font_format = self._get_local_font_base64()
-        
+
         if local_font_data:
             # 使用本地嵌入的字体
-            font_css = f'''
+            font_css = f"""
 <style id="bestdori-font-embedded">
 /* 本地嵌入字体 - 确保任何环境都能正确渲染中文 */
 @font-face {{
@@ -233,11 +235,11 @@ html, body {{
     font-family: var(--zh-font-stack) !important;
 }}
 </style>
-'''
+"""
             logger.info("✅ 已注入嵌入式中文字体支持")
         else:
             # 回退到 Web 字体
-            font_css = '''
+            font_css = """
 <!-- 字体预加载 - 多 CDN 源 -->
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -300,18 +302,18 @@ html, body {
     document.body.appendChild(testEl);
 })();
 </script>
-'''
+"""
             logger.info("✅ 已注入 Web 字体支持（本地字体不存在）")
-        
+
         # 在 <head> 标签后注入字体 CSS
-        if '<head>' in html_content:
-            html_content = html_content.replace('<head>', '<head>\n' + font_css, 1)
-        elif '<HEAD>' in html_content:
-            html_content = html_content.replace('<HEAD>', '<HEAD>\n' + font_css, 1)
+        if "<head>" in html_content:
+            html_content = html_content.replace("<head>", "<head>\n" + font_css, 1)
+        elif "<HEAD>" in html_content:
+            html_content = html_content.replace("<HEAD>", "<HEAD>\n" + font_css, 1)
         else:
             # 如果没有 head 标签，在开头添加
             html_content = font_css + html_content
-        
+
         return html_content
 
     async def html_to_image(
@@ -341,7 +343,7 @@ html, body {
         # 注入字体回退支持
         if inject_fonts:
             html_content = self._inject_font_fallback(html_content)
-        
+
         # 检查渲染功能是否可用
         if not self.is_render_available():
             raise RuntimeError(
@@ -382,8 +384,9 @@ html, body {
 
         # 等待一段时间让字体和图片加载
         import asyncio
+
         await asyncio.sleep(3)  # 等待3秒让字体和图片预加载
-        
+
         logger.info(f"🖼️ 开始渲染: {output_file}")
 
         self.hti.screenshot(url=file_url, save_as=output_file, size=(width, 4000))

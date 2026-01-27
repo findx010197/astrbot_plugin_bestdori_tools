@@ -1375,26 +1375,72 @@ class BestdoriPlugin(Star):
             async for result in self._handle_birthday_query(event, args):
                 yield result
 
-        elif level1 in ["help", "帮助"]:
-            menu_context.set_context(user_id, group_id, menu="main")
-            async for result in self._show_main_menu(event):
+        elif level1 in ["help", "帮助", "?"]:
+            async for result in self._show_help(event):
                 yield result
         else:
             # 尝试作为快捷命令处理（兼容旧指令）
             async for result in self._handle_legacy_command(event, cmd_parts):
                 yield result
 
+    async def _show_help(self, event: AstrMessageEvent):
+        """显示详细帮助信息"""
+        help_text = (
+            "╭─────────────────────────╮\n"
+            "│   📖 Bestdori 使用指南   │\n"
+            "╰─────────────────────────╯\n"
+            "\n"
+            "🎯 【活动查询】\n"
+            "  /event        - 国服当期活动\n"
+            "  /event jp     - 日服当期活动\n"
+            "  /event 297    - 指定活动ID\n"
+            "\n"
+            "🎴 【卡面查询】\n"
+            "  /bd 香澄      - 查询角色卡面\n"
+            "  /bd ksm       - 使用别名查询\n"
+            "  /bd ksm all   - 全部卡面列表\n"
+            "  /bd ksm random - 随机抽卡\n"
+            "  /id 1234      - 卡面大图详情\n"
+            "\n"
+            "🎂 【生日查询】\n"
+            "  /birthday     - 今日生日角色\n"
+            "  /birthday 香澄 - 角色生日信息\n"
+            "\n"
+            "📢 【订阅管理】\n"
+            "  /subscribe    - 订阅播报\n"
+            "  /unsubscribe  - 取消订阅\n"
+            "\n"
+            "🔧 【管理功能】\n"
+            "  /bd admin     - 管理菜单\n"
+            "\n"
+            "📝 角色别名示例:\n"
+            "  ksm=香澄, ykn=友希那, rk=六花\n"
+            "  aya=彩, ks=心, rn=燐子\n"
+            "\n"
+            "💡 输入 /bd 进入交互菜单"
+        )
+        yield event.plain_result(help_text)
+
     async def _show_main_menu(self, event: AstrMessageEvent):
-        """显示一级主菜单 - 简洁格式"""
+        """显示一级主菜单 - 增强版"""
         menu_text = (
-            "[ Bestdori 工具箱 ]\n"
-            "------------------------\n"
-            "  /1 - tools - 工具查询\n"
-            "  /2 - admin - 管理功能\n"
-            "  /3 - games - 趣味游戏\n"
-            "  /4 - download - 资源下载\n"
-            "------------------------\n"
-            "输入 /序号 或 /标识符 继续"
+            "╭─────────────────────────╮\n"
+            "│   🎸 Bestdori 工具箱    │\n"
+            "╰─────────────────────────╯\n"
+            "\n"
+            "📂 功能菜单:\n"
+            "  /1 · tools   - 工具查询\n"
+            "  /2 · admin   - 管理功能\n"
+            "  /3 · games   - 趣味游戏\n"
+            "  /4 · download - 资源下载\n"
+            "\n"
+            "⚡ 快捷指令:\n"
+            "  /event [cn|jp]  - 当期活动\n"
+            "  /birthday [角色] - 生日查询\n"
+            "  /bd [角色名]     - 卡面查询\n"
+            "  /id [卡面ID]     - 卡面详情\n"
+            "\n"
+            "💡 输入 /bd help 查看详细帮助"
         )
         yield event.plain_result(menu_text)
 

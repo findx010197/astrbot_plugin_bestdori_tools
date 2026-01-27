@@ -103,6 +103,27 @@ docker exec -it <container_name> fc-cache -fv
 
 > ⚠️ **重要**: 如果不安装中文字体，生成的卡片图片中的中文会显示为方块乱码
 
+### 清理残留文件
+
+如果在日志中看到类似以下警告，这是因为 plugins 目录中存在无效的文件或文件夹：
+
+```
+插件 astrbot_plugin_bestdori_tools-xxxxx 未找到 main.py，跳过。
+插件 astrbot_plugin_bestdori_tools.rar 未找到 main.py，跳过。
+```
+
+这些警告**不影响插件运行**，但如果想清理它们，可以执行：
+
+```bash
+# 进入 Docker 容器
+docker exec -it <container_name> bash
+
+# 删除残留文件（请根据实际情况调整路径）
+cd /AstrBot/data/plugins
+rm -rf astrbot_plugin_bestdori_tools-*
+rm -f astrbot_plugin_bestdori_tools.rar
+```
+
 ## 🚀 使用方法
 
 ### 基础命令
