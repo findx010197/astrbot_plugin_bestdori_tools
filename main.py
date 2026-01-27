@@ -29,6 +29,7 @@ from .color_extractor import color_extractor
 from .scheduler import BroadcastScheduler, NewsService
 from .subscriber_service import SubscriberService
 from .menu_context import menu_context
+from typing import Optional
 import os
 import asyncio
 import base64
@@ -890,12 +891,8 @@ class BestdoriPlugin(Star):
 
     @filter.command("id")
     async def shortcut_card_id(self, event: AstrMessageEvent, *args):
-        """卡面ID查询命令 /id xxxx"""
-        logger.info(
-            f"[DEBUG] /id 命令被调用, args={args}, message_str={event.message_str}"
-        )
-
-        # 优先使用框架传递的参数
+        """卡面ID查询命令 /id xxxx - 转发到统一处理"""
+        # 从消息文本解析卡面ID
         card_id_str = ""
         if args:
             for arg in args:
@@ -903,7 +900,6 @@ class BestdoriPlugin(Star):
                     card_id_str = str(arg)
                     break
 
-        # 否则从消息文本解析
         if not card_id_str:
             message = event.message_str.strip()
             parts = message.split()
@@ -912,63 +908,9 @@ class BestdoriPlugin(Star):
                     card_id_str = part
                     break
 
-        if not card_id_str:
-            yield event.plain_result("请输入卡面ID，例如: /id 1234")
-            return
-
-        card_id = int(card_id_str)
-        logger.info(f"[DEBUG] 解析到 card_id={card_id}")
-
-        # 获取卡片数据
-        try:
-            cards_data = await self.client.get_cards()
-            if str(card_id) not in cards_data:
-                yield event.plain_result(f"未找到ID为 {card_id} 的卡面")
-                return
-
-            card = Card(card_id, cards_data[str(card_id)])
-            official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
-            logger.info(f"[DEBUG] 找到卡面: {official_name} - {card.title}")
-
-            # 设置上下文，保存卡面ID
-            user_id = event.get_sender_id()
-            group_id = (
-                event.message_obj.group_id
-                if hasattr(event.message_obj, "group_id")
-                else ""
-            )
-            logger.info(
-                f"[DEBUG] 设置上下文: user_id={user_id}, group_id={group_id}, card_id={card_id}"
-            )
-            menu_context.set_context(
-                user_id, group_id, menu="card_detail", card_id=card_id
-            )
-
-            # 显示卡面信息和选项菜单
-            menu = (
-                f"[ 卡面查询 - ID: {card_id} ]\n"
-                f"------------------------\n"
-                f"角色: {official_name}\n"
-                f"标题: {card.title}\n"
-                f"稀有度: {card.rarity}★ | 属性: {card.attribute.capitalize()}\n"
-                f"------------------------\n"
-                f"请选择查询内容:\n"
-                f"  /1 - 插画信息 (特训前后大图)\n"
-                f"  /2 - 详细信息 (卡面详情卡片)\n"
-                f"  /0 - 返回上级\n"
-                f"------------------------\n"
-                f"输入 /1 或 /2 继续"
-            )
-            logger.info("[DEBUG] 准备发送菜单")
-            yield event.plain_result(menu)
-            logger.info("[DEBUG] 菜单已发送")
-
-        except Exception as e:
-            logger.error(f"卡面ID查询失败: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-            yield event.plain_result(f"查询失败: {e}")
+        # 调用统一的处理方法
+        async for result in self._handle_card_id_query(event, card_id_str):
+            yield result
 
     # ==================== 数字快捷命令 ====================
 
@@ -1411,11 +1353,21 @@ class BestdoriPlugin(Star):
             args = " ".join(cmd_parts[1:])
             async for result in self._handle_birthday_query(event, args):
                 yield result
+        elif level1 == "id":
+            # /bd id xxxx - 卡面ID查询
+            card_id_str = cmd_parts[1] if len(cmd_parts) > 1 else ""
+            async for result in self._handle_card_id_query(event, card_id_str):
+                yield result
 
         elif level1 in ["help", "帮助", "?"]:
             async for result in self._show_help(event):
                 yield result
         else:
+            # 检查是否是纯数字（卡面ID快捷查询）
+            if level1.isdigit():
+                async for result in self._handle_card_id_query(event, level1):
+                    yield result
+                return
             # 尝试作为快捷命令处理（兼容旧指令）
             async for result in self._handle_legacy_command(event, cmd_parts):
                 yield result
@@ -3531,6 +3483,62 @@ class BestdoriPlugin(Star):
             logger.error(f"获取卡面插画失败: {e}")
             yield event.plain_result(f"获取失败: {e}")
 
+    async def _handle_card_id_query(self, event: AstrMessageEvent, card_id_str: str):
+        """处理卡面ID查询 - 显示引导菜单"""
+        if not card_id_str or not card_id_str.isdigit():
+            yield event.plain_result("请输入卡面ID，例如: /bd id 1234 或 /bd 1234")
+            return
+
+        card_id = int(card_id_str)
+        logger.info(f"[CardID] 查询卡面ID: {card_id}")
+
+        try:
+            cards_data = await self.client.get_cards()
+            if str(card_id) not in cards_data:
+                yield event.plain_result(f"❌ 未找到ID为 {card_id} 的卡面")
+                return
+
+            card = Card(card_id, cards_data[str(card_id)])
+            official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
+
+            # 设置上下文，保存卡面ID
+            user_id = event.get_sender_id()
+            group_id = (
+                event.message_obj.group_id
+                if hasattr(event.message_obj, "group_id")
+                else ""
+            )
+            menu_context.set_context(
+                user_id, group_id, menu="card_detail", card_id=card_id
+            )
+
+            # 显示卡面信息和选项菜单
+            menu = (
+                f"╭──────────────────────╮\n"
+                f"│   🎴 卡面查询 #{card_id}   │\n"
+                f"╰──────────────────────╯\n"
+                f"\n"
+                f"👤 角色: {official_name}\n"
+                f"📝 标题: {card.title}\n"
+                f"⭐ 稀有度: {card.rarity}★\n"
+                f"🎨 属性: {card.attribute.capitalize()}\n"
+                f"\n"
+                f"━━━━ 请选择查询内容 ━━━━\n"
+                f"  /1 · 插画信息 (HD大图)\n"
+                f"  /2 · 详细信息 (卡面详情)\n"
+                f"  /0 · 返回上级\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"💡 输入 /1 或 /2 继续"
+            )
+            yield event.plain_result(menu)
+
+        except Exception as e:
+            logger.error(f"卡面ID查询失败: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            yield event.plain_result(f"查询失败: {e}")
+
     async def _send_card_detail_page(self, event: AstrMessageEvent, card_id: int):
         """发送卡面的详细信息卡片（HTML渲染）"""
         try:
@@ -3542,20 +3550,17 @@ class BestdoriPlugin(Star):
             card = Card(card_id, cards_data[str(card_id)])
             official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
 
-            # 目前仅支持文字版本详情，HTML图片渲染待未来版本支持
-            msg = (
-                f"[ 卡面详细信息 ]\n"
-                f"------------------------\n"
-                f"ID: {card.card_id}\n"
-                f"角色: {official_name}\n"
-                f"标题: {card.title}\n"
-                f"稀有度: {card.rarity}★\n"
-                f"属性: {card.attribute.capitalize()}\n"
-                f"资源名: {card.resource_set_name}\n"
-                f"发布时间: {card.released_at.get('0', '未知')}\n"
-                f"------------------------"
-            )
-            yield event.plain_result(msg)
+            yield event.plain_result(f"🔄 正在生成 [{official_name}] 的卡面详情卡片...")
+
+            # 渲染卡面详情
+            detail_path = await self._render_card_detail(card)
+            if detail_path and os.path.exists(detail_path):
+                yield event.image_result(detail_path)
+            else:
+                # 如果渲染失败，回退到文字版本
+                yield event.plain_result(
+                    self._format_card_detail_text(card, official_name)
+                )
 
             # 清除上下文
             user_id = event.get_sender_id()
@@ -3568,7 +3573,246 @@ class BestdoriPlugin(Star):
 
         except Exception as e:
             logger.error(f"获取卡面详情失败: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
             yield event.plain_result(f"获取失败: {e}")
+
+    def _format_card_detail_text(self, card: Card, official_name: str) -> str:
+        """格式化卡面详情文字版本（备用）"""
+        # 卡面类型映射
+        card_type_map = {
+            "permanent": "常驻",
+            "limited": "期间限定",
+            "dreamfes": "DreamFes限定",
+            "birthday": "生日限定",
+            "kirafes": "KiraFes限定",
+            "collab": "联动限定",
+        }
+        card_type_name = card_type_map.get(card.card_type, card.card_type)
+
+        # 属性映射
+        attr_map = {
+            "powerful": "红 Powerful",
+            "cool": "蓝 Cool",
+            "pure": "绿 Pure",
+            "happy": "橙 Happy",
+        }
+        attr_cn = attr_map.get(card.attribute.lower(), card.attribute)
+
+        # 发布时间
+        released_ts = card.get_released_at(SERVER_CN)
+        if released_ts:
+            from datetime import datetime
+
+            released_at = datetime.fromtimestamp(released_ts / 1000).strftime(
+                "%Y-%m-%d"
+            )
+        else:
+            released_at = "未知"
+
+        return (
+            f"╭──────────────────────╮\n"
+            f"│   📋 卡面详细信息     │\n"
+            f"╰──────────────────────╯\n"
+            f"\n"
+            f"🆔 ID: {card.card_id}\n"
+            f"👤 角色: {official_name}\n"
+            f"📝 标题: {card.title}\n"
+            f"⭐ 稀有度: {card.rarity}★\n"
+            f"🎨 属性: {attr_cn}\n"
+            f"🏷️ 类型: {card_type_name}\n"
+            f"📦 资源名: {card.resource_set_name}\n"
+            f"📅 发布时间: {released_at}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━"
+        )
+
+    async def _render_card_detail(self, card: Card) -> Optional[str]:
+        """渲染卡面详情为图片"""
+        from datetime import datetime
+
+        try:
+            official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
+            band_name = CHARACTER_BAND_MAP.get(card.character_id, "Unknown")
+            band_icon_url = BAND_ICON_URL_MAP.get(band_name, "")
+
+            # 卡面类型
+            card_type_map = {
+                "permanent": "常驻卡",
+                "limited": "期间限定",
+                "dreamfes": "DreamFes",
+                "birthday": "生日限定",
+                "kirafes": "KiraFes",
+                "collab": "联动限定",
+            }
+            card_type_name = card_type_map.get(card.card_type, "常驻卡")
+
+            # 属性映射
+            attr_map = {
+                "powerful": ("Powerful", "#FF6B6B"),
+                "cool": ("Cool", "#4ECDC4"),
+                "pure": ("Pure", "#95E1D3"),
+                "happy": ("Happy", "#FFE66D"),
+            }
+            attr_info = attr_map.get(
+                card.attribute.lower(), (card.attribute, "#888888")
+            )
+            attr_cn, attr_color = attr_info
+
+            # 属性图标URL
+            attr_icon_map = {
+                "powerful": "https://bestdori.com/res/icon/powerful.svg",
+                "cool": "https://bestdori.com/res/icon/cool.svg",
+                "pure": "https://bestdori.com/res/icon/pure.svg",
+                "happy": "https://bestdori.com/res/icon/happy.svg",
+            }
+            attr_icon_url = attr_icon_map.get(card.attribute.lower(), "")
+
+            # 发布时间
+            released_ts = card.get_released_at(SERVER_CN)
+            if released_ts:
+                released_at = datetime.fromtimestamp(released_ts / 1000).strftime(
+                    "%Y年%m月%d日"
+                )
+            else:
+                released_ts = card.get_released_at(SERVER_JP)
+                if released_ts:
+                    released_at = (
+                        datetime.fromtimestamp(released_ts / 1000).strftime(
+                            "%Y年%m月%d日"
+                        )
+                        + " (JP)"
+                    )
+                else:
+                    released_at = "未知"
+
+            # 获取主题色
+            theme_color = await self._get_character_theme_color(card.character_id)
+            theme_color_light = self._lighten_color(theme_color, 0.85)
+            theme_color_dark = self._darken_color(theme_color, 0.2)
+
+            # 角色头像（使用卡面缩略图）
+            character_avatar_url = card.get_thumb_url(trained=card.rarity >= 3)
+
+            # 星级图标
+            star_icon_url = card.get_star_icon_url(trained=card.rarity >= 3)
+
+            # 缩略图URL
+            thumb_normal_url = card.get_thumb_url(trained=False)
+            thumb_trained_url = (
+                card.get_thumb_url(trained=True) if card.rarity >= 3 else ""
+            )
+
+            # 加载模板
+            template_path = os.path.join(
+                os.path.dirname(__file__), "templates", "card_detail.html"
+            )
+            with open(template_path, "r", encoding="utf-8") as f:
+                template_str = f.read()
+
+            template = self.jinja_env.from_string(template_str)
+
+            html_content = template.render(
+                card_id=card.card_id,
+                character_name=official_name,
+                character_avatar_url=character_avatar_url,
+                band_name=band_name,
+                band_icon_url=band_icon_url,
+                card_title=card.title,
+                rarity=card.rarity,
+                attribute=card.attribute,
+                attribute_cn=attr_cn,
+                attribute_color=attr_color,
+                attribute_icon_url=attr_icon_url,
+                card_type=card.card_type,
+                card_type_name=card_type_name,
+                resource_set_name=card.resource_set_name or "N/A",
+                released_at=released_at,
+                theme_color=theme_color,
+                theme_color_light=theme_color_light,
+                theme_color_dark=theme_color_dark,
+                star_icon_url=star_icon_url,
+                thumb_normal_url=thumb_normal_url,
+                thumb_trained_url=thumb_trained_url,
+                skill_name="",  # 技能信息可后续添加
+                skill_desc="",
+                generated_time=datetime.now().strftime("%Y-%m-%d %H:%M"),
+            )
+
+            # 渲染输出目录
+            output_dir = os.path.join(self.data_dir, "bestdori_tools", "renders")
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f"card_detail_{card.card_id}.png")
+
+            # 使用 RenderService 渲染
+            await self.render_service.render_html_to_image(
+                html_content, output_path, width=520, height=0
+            )
+
+            if os.path.exists(output_path):
+                logger.info(f"卡面详情渲染成功: {output_path}")
+                return output_path
+            else:
+                logger.warning("卡面详情渲染失败，文件未生成")
+                return None
+
+        except Exception as e:
+            logger.error(f"渲染卡面详情失败: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            return None
+
+    async def _get_character_theme_color(self, char_id: int) -> str:
+        """获取角色主题色"""
+        # 尝试从颜色提取器获取
+        try:
+            color = color_extractor.get_character_color(char_id)
+            if color:
+                return color
+        except Exception:
+            pass
+
+        # 默认颜色映射（按乐队）
+        band_colors = {
+            "Poppin'Party": "#FF6B9D",
+            "Afterglow": "#FF5252",
+            "Pastel*Palettes": "#FFB7D5",
+            "Roselia": "#9C27B0",
+            "Hello, Happy World!": "#FFEB3B",
+            "Morfonica": "#4FC3F7",
+            "RAISE A SUILEN": "#F44336",
+            "MyGO!!!!!": "#00BCD4",
+            "Ave Mujica": "#7B1FA2",
+        }
+        band_name = CHARACTER_BAND_MAP.get(char_id, "")
+        return band_colors.get(band_name, "#FF6B9D")
+
+    def _lighten_color(self, hex_color: str, factor: float = 0.5) -> str:
+        """将颜色变浅"""
+        hex_color = hex_color.lstrip("#")
+        r, g, b = (
+            int(hex_color[:2], 16),
+            int(hex_color[2:4], 16),
+            int(hex_color[4:], 16),
+        )
+        r = int(r + (255 - r) * factor)
+        g = int(g + (255 - g) * factor)
+        b = int(b + (255 - b) * factor)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _darken_color(self, hex_color: str, factor: float = 0.2) -> str:
+        """将颜色变深"""
+        hex_color = hex_color.lstrip("#")
+        r, g, b = (
+            int(hex_color[:2], 16),
+            int(hex_color[2:4], 16),
+            int(hex_color[4:], 16),
+        )
+        r = int(r * (1 - factor))
+        g = int(g * (1 - factor))
+        b = int(b * (1 - factor))
+        return f"#{r:02x}{g:02x}{b:02x}"
 
     async def _handle_birthday_query(
         self, event: AstrMessageEvent, char_name: str = ""
