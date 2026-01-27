@@ -99,6 +99,44 @@ class BestdoriPlugin(Star):
         self.scheduler = BroadcastScheduler(self.config, data_dir)
         self._register_scheduler_callbacks()
 
+        # 启动异步初始化任务 (替代 on_astrbot_loaded，确保一定会运行)
+        asyncio.create_task(self.async_init())
+
+    async def async_init(self):
+        """异步初始化任务"""
+        # 等待一小段时间确保框架就绪
+        await asyncio.sleep(2)
+        
+        logger.info("🚀 Bestdori 插件开始异步初始化")
+
+        # 1. 启动缓存清理调度器
+        if self._cache_cleanup_task is None:
+            self._cache_cleanup_task = asyncio.create_task(
+                self.cache_manager.start_cleanup_scheduler()
+            )
+
+        # 2. 执行启动检查 (资源下载等)
+        await self._startup_check()
+
+        # 3. 预热数据
+        try:
+            await self.client.get_events()
+            await self.client.get_cards()
+            logger.info("✅ Bestdori 数据预热完成")
+        except Exception as e:
+            logger.error(f"Bestdori 数据预热失败: {e}")
+
+        # 4. 启动定时播报调度器（确保只启动一次）
+        if not self._scheduler_started:
+            try:
+                # 确保使用最新配置
+                self.scheduler.update_config(self.config)
+                await self.scheduler.start()
+                self._scheduler_started = True
+                logger.info("✅ Bestdori 定时播报调度器已启动")
+            except Exception as e:
+                logger.error(f"定时播报调度器启动失败: {e}")
+
     def _get_config(self, key: str, default=None):
         """
         安全地获取配置值，兼容 AstrBotConfig 和 dict 两种类型
@@ -626,38 +664,10 @@ class BestdoriPlugin(Star):
         )
         return output_path if os.path.exists(output_path) else ""
 
-    @filter.on_astrbot_loaded()
-    async def on_astrbot_loaded(self):
-        """AstrBot 初始化完成时调用 - 在这里启动所有异步任务"""
-        logger.info("🚀 Bestdori 插件收到 AstrBot 初始化完成信号")
-
-        # 1. 启动缓存清理调度器
-        if self._cache_cleanup_task is None:
-            self._cache_cleanup_task = asyncio.create_task(
-                self.cache_manager.start_cleanup_scheduler()
-            )
-
-        # 2. 执行启动检查
-        await self._startup_check()
-
-        # 3. 预热数据
-        try:
-            await self.client.get_events()
-            await self.client.get_cards()
-            logger.info("✅ Bestdori 数据预热完成")
-        except Exception as e:
-            logger.error(f"Bestdori 数据预热失败: {e}")
-
-        # 4. 启动定时播报调度器（确保只启动一次）
-        if not self._scheduler_started:
-            try:
-                # 确保使用最新配置
-                self.scheduler.update_config(self.config)
-                await self.scheduler.start()
-                self._scheduler_started = True
-                logger.info("✅ Bestdori 定时播报调度器已启动")
-            except Exception as e:
-                logger.error(f"定时播报调度器启动失败: {e}")
+    # @filter.on_astrbot_loaded()
+    # async def on_astrbot_loaded(self):
+    #     """AstrBot 初始化完成时调用 - 已迁移至 async_init"""
+    #     pass
 
     async def terminate(self):
         """插件被卸载/停用时调用 - 清理资源"""
