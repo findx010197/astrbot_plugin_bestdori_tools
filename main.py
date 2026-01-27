@@ -891,6 +891,10 @@ class BestdoriPlugin(Star):
     @filter.command("id")
     async def shortcut_card_id(self, event: AstrMessageEvent, *args):
         """卡面ID查询命令 /id xxxx"""
+        logger.info(
+            f"[DEBUG] /id 命令被调用, args={args}, message_str={event.message_str}"
+        )
+
         # 优先使用框架传递的参数
         card_id_str = ""
         if args:
@@ -913,6 +917,7 @@ class BestdoriPlugin(Star):
             return
 
         card_id = int(card_id_str)
+        logger.info(f"[DEBUG] 解析到 card_id={card_id}")
 
         # 获取卡片数据
         try:
@@ -923,6 +928,7 @@ class BestdoriPlugin(Star):
 
             card = Card(card_id, cards_data[str(card_id)])
             official_name = CHARACTER_MAP.get(card.character_id, ["未知"])[0]
+            logger.info(f"[DEBUG] 找到卡面: {official_name} - {card.title}")
 
             # 设置上下文，保存卡面ID
             user_id = event.get_sender_id()
@@ -930,6 +936,9 @@ class BestdoriPlugin(Star):
                 event.message_obj.group_id
                 if hasattr(event.message_obj, "group_id")
                 else ""
+            )
+            logger.info(
+                f"[DEBUG] 设置上下文: user_id={user_id}, group_id={group_id}, card_id={card_id}"
             )
             menu_context.set_context(
                 user_id, group_id, menu="card_detail", card_id=card_id
@@ -950,10 +959,15 @@ class BestdoriPlugin(Star):
                 f"------------------------\n"
                 f"输入 /1 或 /2 继续"
             )
+            logger.info("[DEBUG] 准备发送菜单")
             yield event.plain_result(menu)
+            logger.info("[DEBUG] 菜单已发送")
 
         except Exception as e:
             logger.error(f"卡面ID查询失败: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
             yield event.plain_result(f"查询失败: {e}")
 
     # ==================== 数字快捷命令 ====================
