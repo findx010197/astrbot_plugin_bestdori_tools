@@ -539,6 +539,7 @@ class BestdoriPlugin(Star):
         try:
             # 使用 AstrBot 官方 API 导入
             from astrbot.api.event import MessageChain
+            import astrbot.api.message_components as Comp
 
             # 解析目标类型
             if target.startswith("group_"):
@@ -551,8 +552,10 @@ class BestdoriPlugin(Star):
                 logger.warning(f"未知的目标格式: {target}")
                 return
 
-            # 构建消息链
+            # 构建消息链 - 分离语音消息（语音通常需要单独发送）
             chain = MessageChain()
+            voice_messages = []
+
             for msg in messages:
                 msg_type = msg.get("type", "text")
                 content = msg.get("content", "")
@@ -567,6 +570,12 @@ class BestdoriPlugin(Star):
                         chain.file_image(content)
                     else:
                         logger.warning(f"图片路径无效: {content}")
+                elif msg_type == "voice":
+                    # 语音消息单独收集，稍后发送
+                    if os.path.exists(content):
+                        voice_messages.append(content)
+                    else:
+                        logger.warning(f"语音文件不存在: {content}")
 
             # 获取配置的目标平台（可选，留空自动选择）
             target_platform = self._get_config("broadcast_platform", "")
@@ -650,8 +659,22 @@ class BestdoriPlugin(Star):
 
                     logger.info(f"📤 尝试发送消息到: {unified_msg_origin}")
 
-                    # 使用 context.send_message 发送主动消息
+                    # 使用 context.send_message 发送主动消息（文本+图片）
                     await self.context.send_message(unified_msg_origin, chain)
+
+                    # 单独发送语音消息（语音需要单独的消息链）
+                    for voice_path in voice_messages:
+                        try:
+                            voice_chain = MessageChain()
+                            voice_chain.chain.append(
+                                Comp.Record(file=voice_path, url=voice_path)
+                            )
+                            await self.context.send_message(
+                                unified_msg_origin, voice_chain
+                            )
+                            logger.info(f"✅ 语音消息已发送: {voice_path}")
+                        except Exception as ve:
+                            logger.warning(f"发送语音失败: {ve}")
 
                     sent = True
                     logger.info(f"✅ 已通过 {platform_id} 发送消息到 {target}")
@@ -3673,19 +3696,34 @@ class BestdoriPlugin(Star):
                         logger.info(f"准备发送语音文件: {voice_path}")
 
                         # 将MP3转换为WAV格式（AstrBot只支持WAV）
-                        # 检查是否有 .wav 版本
                         wav_path = voice_path.replace(".mp3", ".wav")
                         if not os.path.exists(wav_path):
                             from .audio_solutions import convert_to_wav
 
                             if convert_to_wav(voice_path, wav_path):
                                 voice_path = wav_path
+                                logger.info(f"语音转码成功: {wav_path}")
                             else:
-                                logger.warning("语音转码失败，尝试发送原文件")
+                                logger.warning("语音转码失败，无法发送语音")
+                                yield event.plain_result(
+                                    f"🔊 语音文件已下载但转码失败\n"
+                                    f"📁 文件位置: {voice_path}\n"
+                                    f"💡 请安装 pydub 或 ffmpeg 以支持语音播放"
+                                )
+                                return
 
-                        yield event.voice_result(voice_path)
+                        # 使用 Comp.Record 发送语音（AstrBot 官方 API）
+                        import astrbot.api.message_components as Comp
+
+                        voice_chain = [Comp.Record(file=voice_path, url=voice_path)]
+                        yield event.chain_result(voice_chain)
+                        logger.info("语音消息发送成功")
                     except Exception as e:
                         logger.warning(f"发送语音失败: {e}")
+                        # 如果发送失败，提供文件路径
+                        yield event.plain_result(
+                            f"🔊 语音发送失败: {e}\n📁 文件位置: {voice_path}"
+                        )
 
         except Exception as e:
             logger.error(f"渲染生日卡片失败: {e}")
